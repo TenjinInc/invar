@@ -1,86 +1,105 @@
-# Dirt::Envelope
+# ENVelope
 
-Details like database connections, passwords, or credentials to external services are different between various 
-deployments and installations (eg. local testing, CI testing, development, demoing, production, staging, ...). As 
-described in the [12 Factor Application](http://12factor.net/config), environment variables are an excellent, 
-scalable way to control these fundamental details of how your app interacts with the outside world. 
+> **Note:** This gem is a prototype spike. The API is not yet stable.
 
-Ruby's built-in `ENV` is the official way to access the environment. The goal of Envelope is to make it even easier to 
-use the environment. Envelope provides these main features: 
+## Big Picture
 
-* Verification - if your app cannot work without some information, you can make it mandatory. 
-* Namespacing - `ENV` hashes are already pretty full. Organize yours to make it easier to find values while debugging. 
-* Symbol key access - Ruby's symbols are fantastic keys, so why not accept them?
+Single source of truth for application-wide configuration and environment variables.
+
+the [12 Factor](http://12factor.net/config) application style is a good start, but the downside to environment variables
+is that they can be leaked to untrustable subprocesses or 3rd party logging services.
+
+### Features
+
+* File schema
+* Location defaults based on the [XDG](https://en.wikipedia.org/wiki/Freedesktop.org#Base_Directory_Specification) file
+  location standard
+* Distinction between configurations and secrets
+* Secrets encrypted using [Lockbox](https://github.com/ankane/lockbox)
+* Immutable
+
+### Anti-Features
+
+Things that ENVelope intentionally does **not** support include:
+
+* Multiple config files
+    * No subtle overrides
+    * No implicit priority-ordering knowledge
+* Modes
+    * A testing environment should control itself
+    * No forgetting to set the mode before running rake, etc
+* Config file code interpretation (eg. ERB in YAML)
+    * Security implications
+    * File structure complexity
+    * Value ambiguity
+
+### But That's Bonkers
+
+It might be! Some situations may legitimately need extremely complex configuration setups. But sometimes a complex
+configuration environment is a code smell indicating that life could be better by:
+
+* Reducing your application into smaller parts (eg. microservices etc)
+* Reducing the number of service providers
+* Improving your deployment process
+
+You know your situation better than this README can.
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'dirt-envelope'
+gem 'procrastinator'
 ```
 
-And then execute:
+And then run in a terminal:
 
-    $ bundle
-
-Or install it manually with:
-
-    $ gem install dirt-envelope
+    bundle install
 
 ## Usage
-Envelope provides a `ENVELOPE` constant that wraps Ruby's basic `ENV` and adds these features: 
-  
-### Symbol Lookup
-Works just like regular lookup, but with a symbol instead. Be aware that this does restrict your variable keys
-to the legal symbol characters `[A-Za-z_]` ... but you should be using only those characters 
-[anyway](http://stackoverflow.com/questions/2821043/allowed-characters-in-linux-environment-variable-names). 
 
-```ruby
-# These two lookups are identical
-ENVELOPE['db_name']
-ENVELOPE[:db_password']
-```
-  
-### Declaring Mandatory Variables
-Some information is just critical to your application doing anything at all. Call `#expect` with the list of mandatory 
-variables. A good place for this is just under the `require` statements in a main config file. 
+### Configs
 
-```ruby
-ENVELOPE.expect :db_user, :db_name
-```
+To create the config file, run this in a terminal:
 
-If any of the listed variables are `nil` or empty, a `Dirt::Envelope::MissingEnvError` will be raised. 
+    bundle exec rake envelope:create:configs
 
-### Declaring Expected Variables
-Other information isn't mandatory in all situations, but should be checked for. Any variable listed with `#desire` will 
-cause a warning to be issued to stderr.   
+If a config file already exists in any of the search path locations, it will yell at you.
 
-```ruby
-ENVELOPE.desire :db_host,
-                :db_password,
-                :email_smtp_type,
-                :email_smtp_user,
-                :email_smtp_password,
-                :email_smtp_port,
-                :email_smtp_address
-```
+To edit the config file, run this in a terminal:
 
+    bundle exec rake envelope:edit:configs
+
+### Secrets
+
+To create the config file, run this in a terminal:
+
+    bundle exec rake envelope:create:secrets
+
+To edit the secrets file, run this and provide the file's encryption key:
+
+    bundle exec rake envelope:edit:secrets
+
+It will then open the decrypted file your default editor (eg. nano). Once you have saved the file, it will be
+re-encrypted.
 
 ## Contributing
+
 Bug reports and pull requests are welcome on GitHub at https://github.com/TenjinInc/dirt-envelope.
 
-This project is intended to be a friendly space for collaboration, and contributors are expected to adhere to the 
+This project is intended to be a friendly space for collaboration, and contributors are expected to adhere to the
 [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
 ### Core Developers
-After checking out the repo, run `bundle install` to install dependencies. Then, run `rake spec` to run the tests. 
-You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the 
-version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, 
+After checking out the repo, run `bundle install` to install dependencies. Then, run `rake spec` to run the tests. You
+can also run `bin/console` for an interactive prompt that will allow you to experiment.
+
+To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the
+version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version,
 push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## License
+
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
 
