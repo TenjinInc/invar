@@ -80,11 +80,10 @@ module Dirt
             attr_accessor :__override_block__
          end
 
-         private
-
          class Scope
             def initialize(data)
                @data = data || {}
+               freeze
             end
 
             def fetch(key)
@@ -99,6 +98,8 @@ module Dirt
 
             alias / fetch
          end
+
+         private
 
          def locate_file(namespace, filename)
             dirs = source_dirs(namespace)

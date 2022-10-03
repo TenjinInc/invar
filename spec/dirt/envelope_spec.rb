@@ -257,6 +257,10 @@ module Dirt
             it 'should scope into subsections with a string' do
                expect(envelope / 'database' / 'host').to eq 'localhost'
             end
+
+            it 'should freeze scopes' do
+               expect(envelope / :database).to be_frozen
+            end
          end
       end
    end
