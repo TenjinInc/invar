@@ -58,7 +58,31 @@ And then run in a terminal:
 
 ## Usage
 
-### Configs
+### Code
+
+Assuming this file in `~/.config/my-app/config.yml`:
+
+```yml
+---
+database:
+  name: 'my_app_development'
+  host: 'localhost'
+```
+
+Then in `my-app.rb`
+
+```ruby
+require 'dirt/envelope'
+
+envelope = Dirt::ENVelope.new 'my-app'
+
+# Prints "my_app_devleopment" 
+puts envelope / :database / :host
+```
+
+### Rake Tasks
+
+#### Configs
 
 To create the config file, run this in a terminal:
 
@@ -70,7 +94,7 @@ To edit the config file, run this in a terminal:
 
     bundle exec rake envelope:edit:configs
 
-### Secrets
+#### Secrets
 
 To create the config file, run this in a terminal:
 
