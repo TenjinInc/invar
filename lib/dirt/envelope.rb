@@ -6,7 +6,6 @@ require 'dirt/envelope/scope'
 require 'yaml'
 require 'lockbox'
 require 'pathname'
-require 'forwardable'
 
 module Dirt
 
@@ -18,9 +17,16 @@ module Dirt
       class MissingConfigFileError < RuntimeError
       end
 
-      # Raised when there are multiple config files found. You can resolve this by choosing one correct location and
-      # removing the alternate file.
+      class MissingSecretsFileError < RuntimeError
+      end
+
+      class SecretsFileDecryptionError < RuntimeError
+      end
+
+      # Raised when there are config or secrets files found at multiple locations. You can resolve this by deciding on
+      # one correct location and removing the alternate file(s).
       class AmbiguousSourceError < RuntimeError
+         HINT = 'Choose 1 correct one and delete the others.'
       end
 
       # XDG values based on https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
@@ -31,45 +37,31 @@ module Dirt
          end
       end
 
+      # Common file extension constants
       module EXT
+         # File extension for YAML files
          YAML = '.yml'
       end
 
       class Envelope
-         def initialize(namespace:)
+         def initialize(namespace:, decryption_key: Lockbox.master_key)
             raise InvalidAppNameError, ':namespace cannot be nil' if namespace.nil?
             raise InvalidAppNameError, ':namespace cannot be an empty string' if namespace.empty?
 
-            config_file = locate_file(namespace, :config)
+            config_file = locate_file(namespace, 'config')
 
-            @configs = Scope.new(YAML.safe_load(config_file&.read, symbolize_names: true))
+            @configs = Scope.new(YAML.safe_load(config_file.read, symbolize_names: true))
 
-            @secrets = Scope.new({})
+            secret_file = locate_file(namespace, 'secrets')
 
-            # secret_files = locate_files(namespace, :secrets)
-            #
-            # # TODO: this should be read from ENV or specific key in config file
-            # master_key         = ENV.fetch('LOCKBOX_KEY') do
-            #    raise KeyError, 'missing environment variable LOCKBOX_KEY' unless $stdin.respond_to? :noecho
-            #    $stderr.puts 'Enter master key:'
-            #    $stdin.noecho(&:gets).strip
-            # end
-            # Lockbox.master_key = master_key
-            #
-            # load_secrets(secret_files, master_key)
-            #
-            # # TODO: should be nice to recursively freeze secrets and configs, so that the whole settings hash chain is frozen
-            # # secrets and main object are frozen prior to calling override block. This is on purpose to prevent folks from
-            # # putting secrets into their code in that block.
-            # @secrets.freeze
-            # freeze
-            #
+            @secrets = Scope.new(load_secrets(secret_file, decryption_key))
+
+            freeze
+
             # # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
             # #       (with a better error msg, hint that it must be set) or if called too early
             # self.class.__override_block__&.call(@configs)
             # @configs.freeze
-
-            freeze
          end
 
          class << self
@@ -96,6 +88,7 @@ module Dirt
 
          private
 
+         # TODO: extract a FileLocator. would simplify tests and could be reused in Rake tasks
          def locate_file(namespace, filename)
             dirs = source_dirs(namespace)
 
@@ -104,11 +97,17 @@ module Dirt
             files = full_paths.select(&:exist?)
 
             if files.size > 1
-               msg = "Found more than 1 config file: #{ files.join(', ') }. Choose 1 correct one and delete the others."
-               raise AmbiguousSourceError, msg
+               msg = "Found more than 1 #{ filename } file: #{ files.join(', ') }."
+               raise AmbiguousSourceError, "#{ msg } #{ AmbiguousSourceError::HINT }"
             elsif files.empty?
-               msg = "No #{ filename } file found. Create config.yml in one of these locations: #{ dirs.join(', ') }"
-               raise MissingConfigFileError, msg
+               paths = dirs.join(', ')
+               if filename.match?(/secrets?/)
+                  msg = "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ paths }"
+                  raise MissingSecretsFileError, msg
+               else
+                  msg = "No config file found. Create config.yml in one of these locations: #{ paths }"
+                  raise MissingConfigFileError, msg
+               end
             end
 
             files.first
@@ -123,23 +122,29 @@ module Dirt
             source_dirs.collect { |path| Pathname.new(path) / namespace }.collect(&:expand_path)
          end
 
-         def load_secrets(files, master_key)
-            # lockbox = Lockbox.new(key: master_key)
-            #
-            # # TODO: error out if any config files are readable by any other user
-            #
-            # files.each do |config_file|
-            #    raw_file  = config_file.binread
-            #    file_data = begin
-            #                   lockbox.decrypt raw_file
-            #                rescue Lockbox::DecryptionError => e
-            #                   raise RuntimeError, "Failed to open #{ config_file } (#{ e })"
-            #                end
-            #    data      = YAML.safe_load(file_data, symbolize_names: true)
-            #    next unless data
-            #
-            #    @secrets.merge!(data)
-            # end
+         def load_secrets(file, decryption_key)
+            if decryption_key.nil? && $stdin.respond_to?(:noecho)
+               warn "Enter master key to decrypt #{ file }:"
+               decryption_key = $stdin.noecho(&:gets).strip
+            end
+
+            lockbox = begin
+                         Lockbox.new(key: decryption_key)
+                      rescue ArgumentError => e
+                         raise SecretsFileDecryptionError, e
+                      end
+
+            # TODO: error out if any config files are readable by any other user
+
+            bytes     = file.binread
+            file_data = begin
+                           lockbox.decrypt bytes
+                        rescue Lockbox::DecryptionError => e
+                           hint = 'Perhaps you used the wrong file decryption key?'
+                           raise SecretsFileDecryptionError, "Failed to open #{ file } (#{ e }). #{ hint }"
+                        end
+
+            YAML.safe_load(file_data, symbolize_names: true)
          end
       end
 
