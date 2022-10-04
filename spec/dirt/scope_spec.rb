@@ -45,6 +45,14 @@ module Dirt
             it 'should scope into subsections with a string' do
                expect(scope / 'database' / 'host').to eq 'localhost'
             end
+
+            it 'should alias #fetch' do
+               expect(scope.fetch(:party).fetch(:host)).to eq 'Bilbo Baggins'
+            end
+
+            it 'should alias #[]' do
+               expect(scope[:party][:host]).to eq 'Bilbo Baggins'
+            end
          end
 
          # expect(envelope / :secret / :ring).to eq 'Precious'

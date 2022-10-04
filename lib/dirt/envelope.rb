@@ -92,6 +92,7 @@ module Dirt
          end
 
          alias / fetch
+         alias [] fetch
 
          private
 

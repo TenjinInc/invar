@@ -262,6 +262,14 @@ module Dirt
                expect(envelope / :config).to_not be(envelope / :secret)
             end
 
+            it 'should alias #fetch' do
+               expect(envelope.fetch(:config)).to be_a Scope
+            end
+
+            it 'should alias #[]' do
+               expect(envelope[:config]).to be_a Scope
+            end
+
             it 'should complain about unknown base scope name' do
                msg = 'The root scope name must be either :config or :secret.'
                expect { envelope / :database }.to raise_error ArgumentError, msg

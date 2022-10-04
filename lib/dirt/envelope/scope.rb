@@ -17,6 +17,7 @@ module Dirt
          end
 
          alias / fetch
+         alias [] fetch
       end
    end
 end
