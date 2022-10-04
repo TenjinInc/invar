@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'dirt/envelope/version'
+require 'dirt/envelope/scope'
+
 require 'yaml'
 require 'lockbox'
 require 'pathname'
@@ -34,21 +36,15 @@ module Dirt
       end
 
       class Envelope
-         extend Forwardable
-
-         def_delegators :@configs, :fetch, :/
-
-         # def_delegator :@secrets, :secret, :fetch
-
-         # attr_reader :configs, :secrets
-
          def initialize(namespace:)
             raise InvalidAppNameError, ':namespace cannot be nil' if namespace.nil?
             raise InvalidAppNameError, ':namespace cannot be an empty string' if namespace.empty?
 
             config_file = locate_file(namespace, :config)
 
-            @configs = Envelope::Scope.new(YAML.safe_load(config_file&.read, symbolize_names: true))
+            @configs = Scope.new(YAML.safe_load(config_file&.read, symbolize_names: true))
+
+            @secrets = Scope.new({})
 
             # secret_files = locate_files(namespace, :secrets)
             #
@@ -80,24 +76,22 @@ module Dirt
             attr_accessor :__override_block__
          end
 
-         class Scope
-            def initialize(data)
-               @data = data || {}
-               freeze
+         # Fetch from one of the two base scopes: :config or :secret.
+         # Plural names are also accepted (ie. :configs and :secrets).
+         #
+         # @param base_scope [Symbol, String]
+         def fetch(base_scope)
+            case base_scope
+            when /configs?/
+               @configs
+            when /secrets?/
+               @secrets
+            else
+               raise ArgumentError, 'The root scope name must be either :config or :secret.'
             end
-
-            def fetch(key)
-               value = @data.fetch(key.to_sym)
-
-               if value.is_a? Hash
-                  Scope.new(value)
-               else
-                  value
-               end
-            end
-
-            alias / fetch
          end
+
+         alias / fetch
 
          private
 

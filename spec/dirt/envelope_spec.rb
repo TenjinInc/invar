@@ -223,43 +223,48 @@ module Dirt
             end
          end
 
-         # Slash operator
+         # Base scopes are separately defined in order to enforce a clear delineation between teh two types of
+         # information and how carefully to treat it. It also causes an explicit reminder that secrets are secret.
          describe '#/' do
-            let(:path) { Pathname.new('~/.config/test-app/config.yml').expand_path }
-            let(:envelope) { described_class.new namespace: 'test-app' }
+            let(:name) { 'test-app' }
+            let(:envelope) { described_class.new namespace: name }
+            let(:config_path) { Pathname.new('~/.config/test-app/config.yml').expand_path }
 
             before(:each) do
-               path.dirname.mkpath
-               path.write <<~YML
-                  ---
-                  domain: example.com
-                  database: 
-                     name: 'test_db'
-                     host: 'localhost'
-                  party:
-                     name: 'Birthday'
-                     host: 'Bilbo Baggins'
+               config_path.dirname.mkpath
+               config_path.write <<~YML
+                  group: fellowship
                YML
             end
 
-            it 'should fetch values with a symbol' do
-               expect(envelope / :domain).to eq 'example.com'
+            it 'should have a :config base scope' do
+               expect(envelope / :config).to be_a Scope
             end
 
-            it 'should fetch values with a string' do
-               expect(envelope / 'domain').to eq 'example.com'
+            it 'should have a :secret base scope' do
+               expect(envelope / :secret).to be_a Scope
             end
 
-            it 'should scope into subsections with a symbol' do
-               expect(envelope / :database / :host).to eq 'localhost'
+            it 'should accept string base scope names' do
+               expect(envelope / 'config').to be_a Scope
+               expect(envelope / 'configs').to be_a Scope
+               expect(envelope / 'secret').to be_a Scope
+               expect(envelope / 'secrets').to be_a Scope
             end
 
-            it 'should scope into subsections with a string' do
-               expect(envelope / 'database' / 'host').to eq 'localhost'
+            # No sense forcing people to remember if its plural or not
+            it 'should accept plural base scope names' do
+               expect(envelope / :configs).to be_a Scope
+               expect(envelope / :secrets).to be_a Scope
             end
 
-            it 'should freeze scopes' do
-               expect(envelope / :database).to be_frozen
+            it 'should keep separate :config and :secret scopes' do
+               expect(envelope / :config).to_not be(envelope / :secret)
+            end
+
+            it 'should complain about unknown base scope name' do
+               msg = 'The root scope name must be either :config or :secret.'
+               expect { envelope / :database }.to raise_error ArgumentError, msg
             end
          end
       end

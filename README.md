@@ -60,13 +60,22 @@ And then run in a terminal:
 
 ### Code
 
-Assuming this file in `~/.config/my-app/config.yml`:
+Assuming file `~/.config/my-app/config.yml` with:
 
 ```yml
 ---
 database:
   name: 'my_app_development'
   host: 'localhost'
+```
+
+And an encrypted file `~/.config/my-app/secrets.yml` with:
+
+```yml
+---
+database:
+  user: 'my_app'
+  pass: 'sekret'
 ```
 
 Then in `my-app.rb`
@@ -76,8 +85,11 @@ require 'dirt/envelope'
 
 envelope = Dirt::ENVelope.new 'my-app'
 
-# Prints "my_app_devleopment" 
-puts envelope / :database / :host
+# Prints "my_app_development" 
+puts envelope / :config / :database / :host
+
+# Prints "my_app" 
+puts envelope / :secret / :database / :username
 ```
 
 ### Rake Tasks
