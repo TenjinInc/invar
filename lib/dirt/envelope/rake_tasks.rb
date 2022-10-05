@@ -7,49 +7,64 @@ module Dirt
       # The actual rake tasks themselves are thinly defined in dirt/envelope/rake.rb (so that the external include
       # path is nice and short)
       module RakeTasks
-         # TODO: replace with actual path search mechanism (though not sure how to handle creates)
-         def self.config_dir
-            Pathname.new('~/.config/').expand_path
-         end
+         CONFIG_TEMPLATE = <<~YML
+            ---
+         YML
+
+         NAMESPACE_ERR = 'namespace argument required'
 
          def self.create_config(namespace)
             if namespace.nil?
-               raise 'app namespace argument required. Run with bundle exec rake envelope:secrets:create[namespace_here]'
+               raise ArgumentError,
+                     "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:configs:create[namespace_here]"
             end
 
-            file = config_dir / namespace / 'config.yml'
+            locator = Dirt::Envelope::FileLocator.new(namespace)
+
+            config_dir = locator.search_paths.first
+            config_dir.mkpath
+
+            file = config_dir / 'config.yml'
             if file.exist?
-               warn 'Abort: File exists. Maybe you meant to edit the file with rake envelope:secrets:edit?'
+               warn <<~MSG
+                  Abort: File exists. (#{ file })
+                  Maybe you meant to edit the file with rake envelope:secrets:edit?
+               MSG
                exit 1
             end
 
-            file.write <<~CONFIG_TEMPLATE
-               ---
-            CONFIG_TEMPLATE
+            file.write CONFIG_TEMPLATE
 
-            warn "Created file #{ file }"
+            warn "Created file: #{ file }"
          end
 
          def self.edit_config(namespace)
             if namespace.nil?
-               raise 'app namespace argument required. Run with bundle exec rake envelope:config:edit[namespace_here]'
+               raise ArgumentError,
+                     "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:configs:edit[namespace_here]"
             end
 
-            # TODO: better to use the actual path search mechanism
-            configs_file = config_dir / namespace / 'config.yml'
+            locator = Dirt::Envelope::FileLocator.new(namespace)
 
-            # TODO: is exception good here? thought is to avoid clobbering exiting file on error.
+            configs_file = begin
+                              locator.find('config.yml')
+                           rescue Dirt::Envelope::FileLocator::FileNotFoundError => e
+                              warn <<~YML
+                                 Abort: #{ e.message }. Searched in: #{ locator.search_paths.join(', ') }
+                                 Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:configs:create?
+                              YML
+                              exit 1
+                           end
+
             system(ENV.fetch('EDITOR', 'editor'), configs_file.to_s, exception: true)
 
-            # TODO: it should warn about file unchanged. hint maybe you forgot to hit save?
-            # TODO: should avoid writing empty string. tell them to delete the file if that is what they want
-
-            warn "File saved to #{ configs_file }"
+            warn "File saved to: #{ configs_file }"
          end
 
          def self.create_secret(namespace)
             if namespace.nil?
-               raise 'app namespace argument required. Run with bundle exec rake envelope:secrets:create[namespace_here]'
+               raise ArgumentError,
+                     "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:secrets:create[namespace_here]"
             end
 
             file = config_dir / namespace / 'secrets.yml'
@@ -82,7 +97,8 @@ module Dirt
 
          def self.edit_secret(namespace)
             if namespace.nil?
-               raise 'app namespace argument required. Run with bundle exec rake envelope:secrets:create[namespace_here]'
+               raise ArgumentError,
+                     "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:secrets:edit[namespace_here]"
             end
 
             # TODO: better to use the actual path search mechanism

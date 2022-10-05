@@ -78,7 +78,7 @@ module Dirt
                end
             end
 
-            context '$HOME is not defined' do
+            context '$HOME is undefined' do
                around(:each) do |example|
                   old_home = Dir.home
                   ENV.delete('HOME')
