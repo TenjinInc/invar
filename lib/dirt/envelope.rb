@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'dirt/envelope/version'
+require 'dirt/envelope/file_locator'
 require 'dirt/envelope/scope'
 
 require 'yaml'
@@ -29,39 +30,33 @@ module Dirt
          HINT = 'Choose 1 correct one and delete the others.'
       end
 
-      # XDG values based on https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-      module XDG
-         module Defaults
-            CONFIG_HOME = '~/.config'
-            CONFIG_DIRS = '/etc/xdg'
-         end
-      end
-
-      # Common file extension constants
-      module EXT
-         # File extension for YAML files
-         YAML = '.yml'
-      end
-
       class Envelope
          def initialize(namespace:, decryption_key: Lockbox.master_key)
             raise InvalidAppNameError, ':namespace cannot be nil' if namespace.nil?
             raise InvalidAppNameError, ':namespace cannot be an empty string' if namespace.empty?
 
-            config_file = locate_file(namespace, 'config')
+            locator      = FileLocator.new(namespace)
+            search_paths = locator.search_paths.join(', ')
 
-            @configs = Scope.new(YAML.safe_load(config_file.read, symbolize_names: true))
+            begin
+               @configs = Scope.new(YAML.safe_load(locator.find('config', EXT::YAML).read, symbolize_names: true))
+            rescue FileLocator::FileNotFoundError
+               msg = "No config file found. Create config.yml in one of these locations: #{ search_paths }"
+               raise MissingConfigFileError, msg
+            end
 
-            secret_file = locate_file(namespace, 'secrets')
-
-            @secrets = Scope.new(load_secrets(secret_file, decryption_key))
+            begin
+               @secrets = Scope.new(load_secrets(locator.find('secrets', EXT::YAML), decryption_key))
+            rescue FileLocator::FileNotFoundError
+               msg = "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
+               raise MissingSecretsFileError, msg
+            end
 
             freeze
 
             # # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
             # #       (with a better error msg, hint that it must be set) or if called too early
             # self.class.__override_block__&.call(@configs)
-            # @configs.freeze
          end
 
          class << self
@@ -87,40 +82,6 @@ module Dirt
          alias [] fetch
 
          private
-
-         # TODO: extract a FileLocator. would simplify tests and could be reused in Rake tasks
-         def locate_file(namespace, filename)
-            dirs = source_dirs(namespace)
-
-            full_paths = dirs.collect { |dir| dir / "#{ filename }#{ EXT::YAML }" }
-
-            files = full_paths.select(&:exist?)
-
-            if files.size > 1
-               msg = "Found more than 1 #{ filename } file: #{ files.join(', ') }."
-               raise AmbiguousSourceError, "#{ msg } #{ AmbiguousSourceError::HINT }"
-            elsif files.empty?
-               paths = dirs.join(', ')
-               if filename.match?(/secrets?/)
-                  msg = "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ paths }"
-                  raise MissingSecretsFileError, msg
-               else
-                  msg = "No config file found. Create config.yml in one of these locations: #{ paths }"
-                  raise MissingConfigFileError, msg
-               end
-            end
-
-            files.first
-         end
-
-         def source_dirs(namespace)
-            home_config_dir = ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)
-            alt_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', XDG::Defaults::CONFIG_DIRS).split(':')
-
-            source_dirs = alt_config_dirs
-            source_dirs.unshift(home_config_dir) if ENV.key? 'HOME'
-            source_dirs.collect { |path| Pathname.new(path) / namespace }.collect(&:expand_path)
-         end
 
          def load_secrets(file, decryption_key)
             if decryption_key.nil? && $stdin.respond_to?(:noecho)

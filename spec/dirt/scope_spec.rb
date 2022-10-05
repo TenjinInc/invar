@@ -5,7 +5,7 @@ require 'spec_helper'
 module Dirt
    module Envelope
       describe Scope do
-         describe '#initailize' do
+         describe '#initialize' do
             let(:scope) { described_class.new }
 
             it 'should freeze scopes' do
@@ -54,8 +54,6 @@ module Dirt
                expect(scope[:party][:host]).to eq 'Bilbo Baggins'
             end
          end
-
-         # expect(envelope / :secret / :ring).to eq 'Precious'
       end
    end
 end
