@@ -8,8 +8,6 @@ require 'lockbox'
 require 'pathname'
 
 module Dirt
-
-   # ENVelope
    module Envelope
       # XDG values based on https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
       module XDG
@@ -29,6 +27,9 @@ module Dirt
          attr_reader :search_paths
 
          def initialize(namespace)
+            raise InvalidNamespaceError, 'namespace cannot be nil' if namespace.nil?
+            raise InvalidNamespaceError, 'namespace cannot be an empty string' if namespace.empty?
+
             @namespace = namespace
 
             home_config_dir = ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)
@@ -55,6 +56,9 @@ module Dirt
          end
 
          class FileNotFoundError < RuntimeError
+         end
+
+         class InvalidNamespaceError < ArgumentError
          end
       end
    end

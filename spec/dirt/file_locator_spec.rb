@@ -25,6 +25,18 @@ module Dirt
                ENV['XDG_CONFIG_DIRS'] = old_xdg_config_dirs
             end
 
+            it 'should explode when provided an empty namespace' do
+               expect do
+                  described_class.new ''
+               end.to raise_error FileLocator::InvalidNamespaceError, 'namespace cannot be an empty string'
+            end
+
+            it 'should explode when provided a nil namespace' do
+               expect do
+                  described_class.new nil
+               end.to raise_error FileLocator::InvalidNamespaceError, 'namespace cannot be nil'
+            end
+
             # This is so that it does not change behaviour if env variables are changed after it is loaded.
             it 'should be frozen' do
                expect(locator).to be_frozen

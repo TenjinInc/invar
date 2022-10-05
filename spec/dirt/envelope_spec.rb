@@ -22,7 +22,6 @@ module Dirt
             "\xF6\xA6qMs5\x0F\x1Fl\xDAS\xE5\xE1x\x8B\x82\xA2^\xF5\x8B%\xDB\x06\xEA$T/\xCF\x14\x98\x9C\xB1"
          end
 
-         # TODO: can this be a before instead?
          around(:each) do |example|
             Lockbox.master_key = default_lockbox_key
             example.run
@@ -31,18 +30,6 @@ module Dirt
          describe '#initialize' do
             it 'should explode when namespace missing' do
                expect { described_class.new }.to raise_error ArgumentError, 'missing keyword: :namespace'
-            end
-
-            it 'should explode when provided an empty namespace' do
-               expect do
-                  described_class.new namespace: ''
-               end.to raise_error InvalidAppNameError, ':namespace cannot be an empty string'
-            end
-
-            it 'should explode when provided a nil namespace' do
-               expect do
-                  described_class.new namespace: nil
-               end.to raise_error InvalidAppNameError, ':namespace cannot be nil'
             end
 
             # Immutability enables safe use in multithreaded situations (like a webserver)
@@ -321,8 +308,6 @@ module Dirt
             end
 
             it 'should fetch secrets from the file' do
-               # ENV['LOCKBOX_MASTER_KEY'] = '000'
-
                expect(envelope / :secret / :pass).to eq 'mellon'
             end
          end

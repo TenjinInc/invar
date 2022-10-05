@@ -9,12 +9,8 @@ require 'lockbox'
 require 'pathname'
 
 module Dirt
-
    # ENVelope
    module Envelope
-      class InvalidAppNameError < ArgumentError
-      end
-
       class MissingConfigFileError < RuntimeError
       end
 
@@ -32,24 +28,21 @@ module Dirt
 
       class Envelope
          def initialize(namespace:, decryption_key: Lockbox.master_key)
-            raise InvalidAppNameError, ':namespace cannot be nil' if namespace.nil?
-            raise InvalidAppNameError, ':namespace cannot be an empty string' if namespace.empty?
-
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
 
             begin
                @configs = Scope.new(YAML.safe_load(locator.find('config', EXT::YAML).read, symbolize_names: true))
             rescue FileLocator::FileNotFoundError
-               msg = "No config file found. Create config.yml in one of these locations: #{ search_paths }"
-               raise MissingConfigFileError, msg
+               raise MissingConfigFileError,
+                     "No config file found. Create config.yml in one of these locations: #{ search_paths }"
             end
 
             begin
                @secrets = Scope.new(load_secrets(locator.find('secrets', EXT::YAML), decryption_key))
             rescue FileLocator::FileNotFoundError
-               msg = "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
-               raise MissingSecretsFileError, msg
+               raise MissingSecretsFileError,
+                     "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
             end
 
             freeze

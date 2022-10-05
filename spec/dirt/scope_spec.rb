@@ -20,7 +20,7 @@ module Dirt
                      domain:   'example.com',
                      database: {
                            name: 'test_db',
-                           host: 'localhost',
+                           host: 'localhost'
                      },
                      party:    {
                            name: 'Birthday',
