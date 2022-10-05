@@ -51,9 +51,11 @@ module Dirt
 
             context 'config file' do
                context 'config file missing' do
+                  let(:name) { 'my-app' }
+
                   it 'should explode' do
                      expect do
-                        described_class.new namespace: 'my-app'
+                        described_class.new namespace: name
                      end.to raise_error MissingConfigFileError, start_with('No config file found.')
                   end
 
@@ -61,24 +63,28 @@ module Dirt
                      msg = 'Create config.yml in one of these locations'
 
                      expect do
-                        described_class.new namespace: 'my-app'
+                        described_class.new namespace: name
                      end.to raise_error MissingConfigFileError, include(msg)
                   end
 
                   it 'should state the locations searched' do
-                     # TODO: this will need to be the full XDG pathset
-                     home_dir  = Pathname.new('~').expand_path
-                     path_list = [home_dir / '.config/my-app']
+                     xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)) / name
+
+                     xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', '/something:/someplace')
+                     xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
 
                      expect do
-                        described_class.new namespace: 'my-app'
-                     end.to raise_error MissingConfigFileError, include(path_list.join(', '))
+                        described_class.new namespace: name
+                     end.to raise_error MissingConfigFileError, include(xdg_config_home.expand_path.to_s)
+                                                                      .and(include(xdg_config_dirs.join(', ')))
                   end
                end
             end
 
             context 'secrets file' do
                context 'secrets file missing' do
+                  let(:name) { 'my-app' }
+
                   before(:each) do
                      config_path = Pathname.new('~/.config/my-app/config.yml').expand_path
                      config_path.dirname.mkpath
@@ -89,7 +95,7 @@ module Dirt
 
                   it 'should explode' do
                      expect do
-                        described_class.new namespace: 'my-app'
+                        described_class.new namespace: name
                      end.to raise_error MissingSecretsFileError, start_with('No secrets file found.')
                   end
 
@@ -97,18 +103,20 @@ module Dirt
                      msg = 'Create encrypted secrets.yml in one of these locations'
 
                      expect do
-                        described_class.new namespace: 'my-app'
+                        described_class.new namespace: name
                      end.to raise_error MissingSecretsFileError, include(msg)
                   end
 
                   it 'should state the locations searched' do
-                     # TODO: this will need to be the full XDG pathset
-                     home_dir  = Pathname.new('~').expand_path
-                     path_list = [home_dir / '.config/my-app']
+                     xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)) / name
+
+                     xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', '/something:/someplace')
+                     xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
 
                      expect do
-                        described_class.new namespace: 'my-app'
-                     end.to raise_error MissingSecretsFileError, include(path_list.join(', '))
+                        described_class.new namespace: name
+                     end.to raise_error MissingSecretsFileError, include(xdg_config_home.expand_path.to_s)
+                                                                       .and(include(xdg_config_dirs.join(', ')))
                   end
                end
 
