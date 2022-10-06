@@ -50,9 +50,9 @@ module Dirt
 
             freeze
 
-            # # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
-            # #       (with a better error msg, hint that it must be set) or if called too early
-            # self.class.__override_block__&.call(@configs)
+            # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
+            #       (with a better error msg, hint that it must be set) or if called too early
+            self.class.__override_block__&.call(self)
          end
 
          class << self

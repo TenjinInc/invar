@@ -4,8 +4,41 @@ require 'spec_helper'
 
 module Dirt
    describe Envelope do
+      let(:default_lockbox_key) { '0000000000000000000000000000000000000000000000000000000000000000' }
+
+      after(:each) do
+         Envelope.override do
+            # nothing
+         end
+      end
+
       it 'should have a version number' do
          expect(Dirt::Envelope::VERSION).not_to be nil
+      end
+
+      it 'should allow an override' do
+         configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
+         configs_dir.mkpath
+         configs_file = configs_dir / 'config.yml'
+         secrets_file = configs_dir / 'secrets.yml'
+
+         configs_file.write <<~YML
+            ---
+            database:
+               name:
+                  dev_database
+         YML
+         box = Lockbox.new(key: default_lockbox_key)
+         secrets_file.write box.encrypt <<~YML
+            ---
+         YML
+
+         Envelope.override do |envelope|
+            (envelope / :configs / :database).override :name, 'test_database'
+         end
+         envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
+
+         expect(envelope / :configs / :database / :name).to eq 'test_database'
       end
    end
 

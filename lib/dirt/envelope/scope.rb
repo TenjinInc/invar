@@ -20,6 +20,10 @@ module Dirt
 
          alias / fetch
          alias [] fetch
+
+         def override(key, new_value)
+            @data[key] = new_value
+         end
       end
    end
 end
