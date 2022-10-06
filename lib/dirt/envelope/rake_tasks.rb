@@ -100,40 +100,56 @@ module Dirt
                      "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:secrets:edit[namespace_here]"
             end
 
-            # TODO: better to use the actual path search mechanism
-            secrets_file = config_dir / namespace / 'secrets.yml'
+            locator = Dirt::Envelope::FileLocator.new(namespace)
 
-            master_key = ENV.fetch 'LOCKBOX_KEY' do
-               $stderr.puts 'Enter master key:'
-               $stdin.noecho(&:gets).strip
-            end
+            secrets_file = begin
+                              locator.find('secrets.yml')
+                           rescue Dirt::Envelope::FileLocator::FileNotFoundError => e
+                              warn <<~YML
+                                 Abort: #{ e.message }. Searched in: #{ locator.search_paths.join(', ') }
+                                 Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:secrets:create?
+                              YML
+                              exit 1
+                           end
 
-            lockbox = Lockbox.new(key: master_key)
-
-            file_str = Tempfile.create(secrets_file.basename.to_s) do |tmp_file|
-               decrypted = lockbox.decrypt(secrets_file.binread)
-
-               tmp_file.write(decrypted)
-               tmp_file.rewind # rewind seems to be needed before system call for some reason?
-               # TODO: is exception good here? thought is to avoid clobbering exiting file on error.
-               system(ENV.fetch('EDITOR', 'editor'), tmp_file.path, exception: true)
-               tmp_file.read
-            end
-
-            # TODO: it should warn about file unchanged. hint maybe you forgot to hit save?
-            # TODO: should avoid writing empty string. tell them to delete the file if that is what they want
-            secrets_file.binwrite(lockbox.encrypt(file_str))
+            edit_encrypted_file(secrets_file)
 
             warn "File saved to #{ secrets_file }"
          end
 
-         def self.write_encrypted_file(file_path, decryption_key, content)
-            lockbox = Lockbox.new(key: decryption_key)
+         def self.write_encrypted_file(file_path, encryption_key, content)
+            lockbox = Lockbox.new(key: encryption_key)
 
             encrypted_data = lockbox.encrypt(content)
 
             # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
             File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
+         end
+
+         def self.edit_encrypted_file(file_path)
+            encryption_key = Lockbox.master_key
+
+            if encryption_key.nil? && $stdin.respond_to?(:noecho)
+               warn "Enter master key to decrypt #{ file_path }:"
+               encryption_key = $stdin.noecho(&:gets).strip
+            end
+
+            lockbox = begin
+                         Lockbox.new(key: encryption_key)
+                      rescue ArgumentError => e
+                         raise SecretsFileEncryptionError, e
+                      end
+
+            file_str = Tempfile.create(file_path.basename.to_s) do |tmp_file|
+               decrypted = lockbox.decrypt(file_path.binread)
+
+               tmp_file.write(decrypted)
+               tmp_file.rewind # rewind needed because file does not get closed after write
+               system(ENV.fetch('EDITOR', 'editor'), tmp_file.path, exception: true)
+               tmp_file.read
+            end
+
+            write_encrypted_file(file_path, encryption_key, file_str)
          end
       end
    end

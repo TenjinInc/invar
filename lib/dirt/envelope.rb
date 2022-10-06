@@ -17,6 +17,9 @@ module Dirt
       class MissingSecretsFileError < RuntimeError
       end
 
+      class SecretsFileEncryptionError < RuntimeError
+      end
+
       class SecretsFileDecryptionError < RuntimeError
       end
 

@@ -319,6 +319,11 @@ describe 'Rake Tasks' do
    context 'envelope:secrets:edit' do
       let(:task) { ::Rake::Task['envelope:secrets:edit'] }
 
+      before(:each) do
+         # Prevent it from opening actual editor
+         allow(Dirt::Envelope::RakeTasks).to receive(:system)
+      end
+
       it 'should define a secrets edit task' do
          expect(::Rake::Task.task_defined?('envelope:secrets:edit')).to be true
       end
@@ -329,11 +334,161 @@ describe 'Rake Tasks' do
       end
 
       context '$HOME is defined' do
-         it 'should edit the secrets file in the XDG_CONFIG_HOME path'
-      end
+         let(:home) { '/some/home/dir' }
+         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-      context '$HOME is undefined' do
-         it 'should edit the secrets file in the first XDG_CONFIG_DIRS path'
+         around(:each) do |example|
+            old_home    = Dir.home
+            ENV['HOME'] = home.to_s
+            example.run
+            ENV['HOME'] = old_home
+         end
+
+         before(:each) do
+            configs_dir.mkpath
+            lockbox = Lockbox.new(key: default_lockbox_key)
+
+            secrets_path.write lockbox.encrypt <<~YML
+               ---
+            YML
+         end
+
+         context 'Lockbox master key is defined' do
+            before(:each) do
+               Lockbox.master_key = default_lockbox_key
+            end
+
+            around(:each) do |example|
+               old_key            = Lockbox.master_key
+               Lockbox.master_key = default_lockbox_key
+               example.run
+               Lockbox.master_key = old_key
+            end
+
+            it 'should NOT ask for it from STDIN' do
+               msg = 'Enter master key to decrypt'
+
+               expect do
+                  $stdin = double('fake IO', noecho: default_lockbox_key)
+                  task.invoke(name)
+                  $stdin = STDIN
+               end.to_not output(include(msg)).to_stderr
+            end
+         end
+
+         context 'Lockbox master key is undefined' do
+            around(:each) do |example|
+               old_key            = Lockbox.master_key
+               Lockbox.master_key = nil
+               example.run
+               Lockbox.master_key = old_key
+            end
+
+            context 'STDIN can #noecho' do
+               it 'should ask for it from STDIN' do
+                  msg = "Enter master key to decrypt #{ secrets_path }:"
+
+                  expect do
+                     $stdin = double('fake IO', noecho: default_lockbox_key)
+                     task.invoke(name)
+                     $stdin = STDIN
+                  end.to output(start_with(msg)).to_stderr
+               end
+
+               it 'should read the password from STDIN without echo' do
+                  input = double('fake input')
+
+                  $stdin = input
+
+                  expect(input).to receive(:noecho).and_return default_lockbox_key
+
+                  task.invoke(name)
+
+                  $stdin = STDIN
+               end
+            end
+
+            context 'STDIN cannot #noecho' do
+               let(:input) { StringIO.new }
+
+               around(:each) do |example|
+                  $stdin = input
+                  example.run
+                  $stdin = STDIN
+               end
+
+               it 'should raise an error instead of asking from STDIN' do
+                  expect do
+                     task.invoke(name)
+                  end.to(raise_error(Dirt::Envelope::SecretsFileEncryptionError).and(output('').to_stderr))
+               end
+            end
+         end
+
+         it 'should abort if the file does not exist' do
+            secrets_path.delete
+
+            xdg_home = ENV.fetch('XDG_CONFIG_HOME', Dirt::Envelope::XDG::Defaults::CONFIG_HOME)
+            xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':')
+
+            search_path = [Pathname.new(xdg_home).expand_path / name].concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+
+            msg = <<~MSG
+               Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
+               Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:secrets:create?
+            MSG
+
+            expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+         end
+
+         it 'should clone the decrypted contents into the tempfile' do
+            Lockbox.master_key = default_lockbox_key
+            new_content        = '---'
+            tmpfile            = double('tmpfile', path: '/tmp/whatever', read: new_content)
+
+            allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return new_content
+
+            expect(tmpfile).to receive(:write).with("---\n")
+            expect(tmpfile).to receive(:rewind)
+
+            task.invoke(name)
+         end
+
+         it 'should edit the secrets tmpfile' do
+            Lockbox.master_key = default_lockbox_key
+            tmpfile            = double('tmpfile', write: nil, rewind: nil, read: '---', path: '/tmp/whatever')
+
+            allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
+
+            # the intention of 'exception: true' is to noisily fail, which can be useful when automating
+            expect(Dirt::Envelope::RakeTasks).to receive(:system).with('editor', '/tmp/whatever', exception: true)
+
+            task.invoke(name)
+         end
+
+         it 'should update the encrypted file with new contents' do
+            Lockbox.master_key = default_lockbox_key
+
+            new_contents = <<~YML
+               ---
+               password: mellon
+            YML
+            tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
+            allow(Tempfile).to receive(:create).and_yield tmpfile
+
+            task.invoke(name)
+
+            lockbox = Lockbox.new(key: default_lockbox_key)
+
+            expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
+         end
+
+         it 'should state the file saved' do
+            Lockbox.master_key = default_lockbox_key
+
+            expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
+         end
       end
    end
 end
