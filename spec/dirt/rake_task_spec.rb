@@ -7,6 +7,7 @@ require 'dirt/envelope/rake'
 
 describe 'Rake Tasks' do
    let(:name) { 'test-app' }
+   let(:default_lockbox_key) { '0000000000000000000000000000000000000000000000000000000000000000' }
 
    before(:each) do
       task.reenable
@@ -46,7 +47,7 @@ describe 'Rake Tasks' do
 
             msg = <<~MSG
                Abort: File exists. (#{ config_path })
-               Maybe you meant to edit the file with rake envelope:secrets:edit?
+               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
             MSG
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
          end
@@ -192,11 +193,126 @@ describe 'Rake Tasks' do
       end
 
       context '$HOME is defined' do
-         it 'should create a secrets file in the XDG_CONFIG_HOME path'
+         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+
+         it 'should create a secrets file in the XDG_CONFIG_HOME path' do
+            task.invoke(name)
+
+            expect(configs_dir / 'secrets.yml').to exist
+         end
+
+         it 'should encrypt the secrets file' do
+            allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+            task.invoke(name)
+
+            box = Lockbox.new(key: default_lockbox_key)
+
+            encrypted = (configs_dir / 'secrets.yml').binread
+
+            expect(box.decrypt(encrypted)).to eq Dirt::Envelope::RakeTasks::SECRETS_TEMPLATE
+         end
+
+         it 'should provide instructions for handling the secret' do
+            expect do
+               task.invoke(name)
+            end.to output(include(Dirt::Envelope::RakeTasks::SECRETS_INSTRUCTIONS)).to_stderr
+         end
+
+         # this allows easier piping to a file or whatever
+         it 'should print the secret to stdout' do
+            allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+            expect do
+               task.invoke(name)
+            end.to output(include(default_lockbox_key)).to_stdout
+         end
+
+         it 'should state the file it created' do
+            secrets_path = configs_dir / 'secrets.yml'
+
+            expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
+         end
+
+         it 'should abort if the file already exists' do
+            secrets_path = configs_dir / 'secrets.yml'
+            configs_dir.mkpath
+            secrets_path.write ''
+
+            msg = <<~MSG
+               Abort: File exists. (#{ secrets_path })
+               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
+            MSG
+            expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+         end
       end
 
       context '$HOME is undefined' do
-         it 'should create a secrets file in the first XDG_CONFIG_DIRS path'
+         let(:search_path) do
+            ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
+               Pathname.new(p) / name
+            end
+         end
+         let(:configs_dir) { search_path.first }
+         let(:secrets_path) { configs_dir / 'secrets.yml' }
+
+         around(:each) do |example|
+            old_home = Dir.home
+            ENV.delete('HOME')
+            example.run
+            ENV['HOME'] = old_home
+         end
+
+         it 'should create a secrets file in the first XDG_CONFIG_DIRS path' do
+            task.invoke(name)
+
+            expect(secrets_path).to exist
+         end
+
+         it 'should encrypt the secrets file' do
+            allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+            task.invoke(name)
+
+            box = Lockbox.new(key: default_lockbox_key)
+
+            encrypted = secrets_path.binread
+
+            expect(box.decrypt(encrypted)).to eq Dirt::Envelope::RakeTasks::SECRETS_TEMPLATE
+         end
+
+         it 'should provide instructions for handling the secret' do
+            expect do
+               task.invoke(name)
+            end.to output(include(Dirt::Envelope::RakeTasks::SECRETS_INSTRUCTIONS)).to_stderr
+         end
+
+         # this allows easier piping to a file or whatever
+         it 'should print the secret to stdout' do
+            allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+            expect do
+               task.invoke(name)
+            end.to output(include(default_lockbox_key)).to_stdout
+         end
+
+         it 'should state the file it created' do
+            secrets_path = configs_dir / 'secrets.yml'
+
+            expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
+         end
+
+         it 'should abort if the file already exists' do
+            secrets_path = configs_dir / 'secrets.yml'
+            configs_dir.mkpath
+            secrets_path.write ''
+
+            msg = <<~MSG
+               Abort: File exists. (#{ secrets_path })
+               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
+            MSG
+            expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+         end
       end
    end
 
