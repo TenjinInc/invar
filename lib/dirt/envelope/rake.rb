@@ -29,4 +29,9 @@ namespace :envelope do
          Dirt::Envelope::RakeTasks.edit_secret(args[:namespace])
       end
    end
+
+   desc 'Show directories to be searched for the given namespace'
+   task :paths, [:namespace] do |_task, args|
+      Dirt::Envelope::RakeTasks.show_paths(args[:namespace])
+   end
 end

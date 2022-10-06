@@ -151,6 +151,16 @@ module Dirt
 
             write_encrypted_file(file_path, encryption_key, file_str)
          end
+
+         def self.show_paths(namespace)
+            if namespace.nil?
+               raise ArgumentError, "#{ NAMESPACE_ERR }. Run with: bundle exec rake envelope:paths[namespace_here]"
+            end
+
+            locator = FileLocator.new(namespace)
+
+            warn locator.search_paths.join("\n")
+         end
       end
    end
 end

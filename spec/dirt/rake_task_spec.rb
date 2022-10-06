@@ -491,4 +491,30 @@ describe 'Rake Tasks' do
          end
       end
    end
+
+   context 'envelope:paths' do
+      let(:task) { ::Rake::Task['envelope:paths'] }
+
+      it 'should explode if the namespace argument is missing' do
+         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error ArgumentError, msg
+      end
+
+      it 'should report the search paths' do
+         xdg_config_home = ENV.fetch('XDG_CONFIG_HOME', Dirt::Envelope::XDG::Defaults::CONFIG_HOME)
+         xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':')
+
+         xdg_config_home_path  = Pathname.new(xdg_config_home).expand_path / name
+         xdg_config_dirs_paths = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
+
+         expected_stderr = <<~ERR
+            #{ xdg_config_home_path }
+            #{ xdg_config_dirs_paths.join("\n") }
+         ERR
+
+         expect do
+            task.invoke(name)
+         end.to output(expected_stderr).to_stderr
+      end
+   end
 end
