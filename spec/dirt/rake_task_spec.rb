@@ -20,6 +20,10 @@ describe 'Rake Tasks' do
          expect(::Rake::Task.task_defined?('envelope:configs:create')).to be true
       end
 
+      it 'should alias config:create' do
+         expect(::Rake::Task.task_defined?('envelope:config:create')).to be true
+      end
+
       it 'should explode if the namespace argument is missing' do
          msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
          expect { task.invoke }.to raise_error ArgumentError, msg
@@ -90,6 +94,10 @@ describe 'Rake Tasks' do
 
       it 'should define a configs edit task' do
          expect(::Rake::Task.task_defined?('envelope:configs:edit')).to be true
+      end
+
+      it 'should alias config:create' do
+         expect(::Rake::Task.task_defined?('envelope:config:edit')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
@@ -185,6 +193,10 @@ describe 'Rake Tasks' do
 
       it 'should define a secrets create task' do
          expect(::Rake::Task.task_defined?('envelope:secrets:create')).to be true
+      end
+
+      it 'should alias secret:create' do
+         expect(::Rake::Task.task_defined?('envelope:secret:create')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
@@ -326,6 +338,10 @@ describe 'Rake Tasks' do
 
       it 'should define a secrets edit task' do
          expect(::Rake::Task.task_defined?('envelope:secrets:edit')).to be true
+      end
+
+      it 'should alias secret:edit' do
+         expect(::Rake::Task.task_defined?('envelope:secret:edit')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do

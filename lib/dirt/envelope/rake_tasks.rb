@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'dirt/envelope'
+
 module Dirt
    module Envelope
       # Rake task implementation.

@@ -30,6 +30,16 @@ namespace :envelope do
       end
    end
 
+   # aliasing
+   namespace :config do
+      task :create, [:namespace] => ['configs:create']
+      task :edit, [:namespace] => ['configs:edit']
+   end
+   namespace :secret do
+      task :create, [:namespace] => ['secrets:create']
+      task :edit, [:namespace] => ['secrets:edit']
+   end
+
    desc 'Show directories to be searched for the given namespace'
    task :paths, [:namespace] do |_task, args|
       Dirt::Envelope::RakeTasks.show_paths(args[:namespace])
