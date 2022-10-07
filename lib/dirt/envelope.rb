@@ -35,7 +35,7 @@ module Dirt
             search_paths = locator.search_paths.join(', ')
 
             begin
-               @configs = Scope.new(YAML.safe_load(locator.find('config', EXT::YAML).read, symbolize_names: true))
+               @configs = Scope.new(parse(locator.find('config', EXT::YAML).read))
             rescue FileLocator::FileNotFoundError
                raise MissingConfigFileError,
                      "No config file found. Create config.yml in one of these locations: #{ search_paths }"
@@ -52,6 +52,7 @@ module Dirt
 
             # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
             #       (with a better error msg, hint that it must be set) or if called too early
+            # instance_eval(&self.class.__override_block__)
             self.class.__override_block__&.call(self)
          end
 
@@ -101,17 +102,21 @@ module Dirt
                            raise SecretsFileDecryptionError, "Failed to open #{ file } (#{ e }). #{ hint }"
                         end
 
+            parse(file_data)
+         end
+
+         def parse(file_data)
             YAML.safe_load(file_data, symbolize_names: true)
          end
       end
 
       class << self
-         # Override block that will be run after loading from config files and prior to freezing. It is intended to allow
+         # Block that will be run after loading from config files and prior to freezing. It is intended to allow
          # for test suites to tweak configurations without having to duplicate the entire config file.
          #
          # @yieldparam the configs from the Envelope
          # @return [void]
-         def override(&block)
+         def after_load(&block)
             ::Dirt::Envelope::Envelope.__override_block__ = block
          end
       end

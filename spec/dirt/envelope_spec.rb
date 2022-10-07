@@ -6,39 +6,60 @@ module Dirt
    describe Envelope do
       let(:default_lockbox_key) { '0000000000000000000000000000000000000000000000000000000000000000' }
 
-      after(:each) do
-         Envelope.override do
-            # nothing
-         end
-      end
-
       it 'should have a version number' do
          expect(Dirt::Envelope::VERSION).not_to be nil
       end
 
-      it 'should allow an override' do
-         configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
-         configs_dir.mkpath
-         configs_file = configs_dir / 'config.yml'
-         secrets_file = configs_dir / 'secrets.yml'
-
-         configs_file.write <<~YML
-            ---
-            database:
-               name:
-                  dev_database
-         YML
-         box = Lockbox.new(key: default_lockbox_key)
-         secrets_file.write box.encrypt <<~YML
-            ---
-         YML
-
-         Envelope.override do |envelope|
-            (envelope / :configs / :database).override :name, 'test_database'
+      describe '.override' do
+         let(:config_content) do
+            <<~YML
+               ---
+               database:
+                  name: dev_database
+                  hostname: localhost
+            YML
          end
-         envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
 
-         expect(envelope / :configs / :database / :name).to eq 'test_database'
+         before(:each) do
+            configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
+            configs_dir.mkpath
+            configs_file = configs_dir / 'config.yml'
+            secrets_file = configs_dir / 'secrets.yml'
+
+            configs_file.write config_content
+            box = Lockbox.new(key: default_lockbox_key)
+            secrets_file.write box.encrypt <<~YML
+               ---
+            YML
+         end
+
+         after(:each) do
+            Envelope.after_load do
+               # nothing
+            end
+         end
+
+         it 'should allow an override' do
+            new_db_name = 'test_database'
+
+            Envelope.after_load do |envelope|
+               (envelope / :config / :database).override name: new_db_name
+            end
+            envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
+
+            expect(envelope / :configs / :database / :name).to eq new_db_name
+         end
+
+         it 'should only override the relevant info' do
+            new_db_name = 'test_database'
+
+            Envelope.after_load do |envelope|
+               (envelope / :config / :database).override name: new_db_name
+            end
+            envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
+
+            expect(envelope / :configs / :database / :hostname).to eq 'localhost'
+         end
       end
    end
 
