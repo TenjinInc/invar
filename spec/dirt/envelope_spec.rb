@@ -348,6 +348,11 @@ module Dirt
                expect(envelope / :secrets).to be_a Scope
             end
 
+            it 'should ignore case' do
+               expect(envelope / 'CONFIGS').to be_a Scope
+               expect(envelope / :configs / 'LOCATION').to eq 'Moria'
+            end
+
             it 'should keep separate :config and :secret scopes' do
                expect(envelope / :config).to_not be(envelope / :secret)
             end
@@ -371,6 +376,44 @@ module Dirt
 
             it 'should fetch secrets from the file' do
                expect(envelope / :secret / :pass).to eq 'mellon'
+            end
+
+            context 'ENV configs' do
+               let(:value) { 'some value' }
+
+               around(:each) do |example|
+                  ENV['TEST_CONFIG'] = value
+                  example.run
+                  ENV['TEST_CONFIG'] = nil
+               end
+
+               it 'should fetch configs from ENV' do
+                  expect(envelope / :config / 'TEST_CONFIG').to eq value
+               end
+
+               it 'should fetch ignoring case' do
+                  expect(envelope / :config / 'test_config').to eq value
+               end
+
+               it 'should fetch as symbols' do
+                  expect(envelope / :config / :test_config).to eq value
+               end
+
+               it 'should explode if there are collisions with ENV' do
+                  # testing both uppercase collisions and lowercase collisions
+                  %w[test_config TEST_CONFIG].each do |key|
+                     configs_path.write <<~YML
+                        ---
+                        #{ key }: 'something'
+                     YML
+
+                     msg  = 'Both the environment and your config file have key'
+                     hint = EnvConfigCollisionError::HINT
+
+                     expect { envelope }.to raise_error(EnvConfigCollisionError,
+                                                        include(msg).and(include(key.downcase)).and(include(hint)))
+                  end
+               end
             end
          end
       end

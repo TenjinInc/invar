@@ -18,7 +18,8 @@ module Dirt
          # @raise KeyError if no such key exists.
          # @see #override
          def fetch(key)
-            @data_override.fetch(key.downcase.to_sym, @data.fetch(key.to_sym))
+            key = key.downcase.to_sym
+            @data_override.fetch(key, @data.fetch(key))
          end
 
          alias / fetch
@@ -36,11 +37,10 @@ module Dirt
          private
 
          def convert(data)
-            (data || {}).dup.inject({}) do |agg, pair|
+            (data || {}).dup.each_with_object({}) do |pair, agg|
                key, value = pair
 
                agg[key] = value.is_a?(Hash) ? Scope.new(value) : value
-               agg
             end
          end
       end

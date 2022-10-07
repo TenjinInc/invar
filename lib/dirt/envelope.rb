@@ -23,6 +23,10 @@ module Dirt
       class SecretsFileDecryptionError < RuntimeError
       end
 
+      class EnvConfigCollisionError < RuntimeError
+         HINT = 'Either rename your config entry or remove the environment variable.'
+      end
+
       # Raised when there are config or secrets files found at multiple locations. You can resolve this by deciding on
       # one correct location and removing the alternate file(s).
       class AmbiguousSourceError < RuntimeError
@@ -35,14 +39,14 @@ module Dirt
             search_paths = locator.search_paths.join(', ')
 
             begin
-               @configs = Scope.new(parse(locator.find('config', EXT::YAML).read))
+               @configs = Scope.new(load_configs(locator))
             rescue FileLocator::FileNotFoundError
                raise MissingConfigFileError,
                      "No config file found. Create config.yml in one of these locations: #{ search_paths }"
             end
 
             begin
-               @secrets = Scope.new(load_secrets(locator.find('secrets', EXT::YAML), decryption_key))
+               @secrets = Scope.new(load_secrets(locator, decryption_key))
             rescue FileLocator::FileNotFoundError
                raise MissingSecretsFileError,
                      "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
@@ -66,9 +70,9 @@ module Dirt
          # @param base_scope [Symbol, String]
          def fetch(base_scope)
             case base_scope
-            when /configs?/
+            when /configs?/i
                @configs
-            when /secrets?/
+            when /secrets?/i
                @secrets
             else
                raise ArgumentError, 'The root scope name must be either :config or :secret.'
@@ -80,7 +84,26 @@ module Dirt
 
          private
 
-         def load_secrets(file, decryption_key)
+         def load_configs(locator)
+            env = ENV.to_hash.transform_keys(&:downcase).transform_keys(&:to_sym)
+
+            file = locator.find('config', EXT::YAML)
+
+            configs = parse(file.read)
+
+            collision_key = configs.keys.collect(&:downcase).find { |key| env.key? key }
+            if collision_key
+               hint = EnvConfigCollisionError::HINT
+               raise EnvConfigCollisionError,
+                     "Both the environment and your config file have key #{ collision_key }. #{ hint }"
+            end
+
+            configs.merge(env)
+         end
+
+         def load_secrets(locator, decryption_key)
+            file = locator.find('secrets', EXT::YAML)
+
             if decryption_key.nil? && $stdin.respond_to?(:noecho)
                warn "Enter master key to decrypt #{ file }:"
                decryption_key = $stdin.noecho(&:gets).strip
@@ -106,7 +129,7 @@ module Dirt
          end
 
          def parse(file_data)
-            YAML.safe_load(file_data, symbolize_names: true)
+            YAML.safe_load(file_data, symbolize_names: true) || {}
          end
       end
 
