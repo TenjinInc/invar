@@ -15,6 +15,11 @@ module Dirt
          # Allowed permissions modes for lockfile. Readable or read-writable by the current user only
          ALLOWED_LOCKFILE_MODES = [0o600, 0o400].freeze
 
+         # Constructs a new Envelope.
+         #
+         # @param [String] namespace name of the subdirectory within XDG locations
+         # @param [String, #to_path] decryption_key Either the raw decryption key string or a #to_path capable object
+         #                                          and assumed to be a file name.
          def initialize(namespace:, decryption_key: Lockbox.master_key)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
@@ -90,8 +95,6 @@ module Dirt
                          raise SecretsFileDecryptionError, e
                       end
 
-            # TODO: error out if any config files are readable by any other user
-
             bytes     = file.binread
             file_data = begin
                            lockbox.decrypt bytes
@@ -111,19 +114,19 @@ module Dirt
             if decryption_key.nil? && $stdin.respond_to?(:noecho)
                warn prompt
                $stdin.noecho(&:gets).strip
-            elsif decryption_key.is_a? Pathname
+            elsif decryption_key.respond_to? :to_path
                read_keyfile(locator, decryption_key)
             else
                decryption_key
             end
          end
 
-         def read_keyfile(locator, path)
+         def read_keyfile(locator, pathname)
             key_file = begin
-                          locator.find(path)
+                          locator.find(pathname.to_path)
                        rescue FileLocator::FileNotFoundError
                           raise SecretsFileDecryptionError,
-                                "Could not find file '#{ path }'. Searched in: #{ locator.search_paths }"
+                                "Could not find file '#{ pathname }'. Searched in: #{ locator.search_paths }"
                        end
 
             permissions_mask = 0o777 # only the lowest three digits are perms, so masking
