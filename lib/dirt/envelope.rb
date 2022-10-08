@@ -11,15 +11,24 @@ require 'pathname'
 module Dirt
    # ENVelope
    module Envelope
+      # Alias for Envelope::Envelope.new
+      #
+      # @see Envelope.new
+      def self.new(**args)
+         Envelope.new(**args)
+      end
+
+      # A wrapper for config and ENV variable data. It endeavours to limit your situation to a single source of truth.
       class Envelope
          # Allowed permissions modes for lockfile. Readable or read-writable by the current user only
          ALLOWED_LOCKFILE_MODES = [0o600, 0o400].freeze
 
          # Constructs a new Envelope.
          #
+         # Do NOT hardcode your encryption key.
+         #
          # @param [String] namespace name of the subdirectory within XDG locations
-         # @param [String, #to_path] decryption_key Either the raw decryption key string or a #to_path capable object
-         #                                          and assumed to be a file name.
+         # @param [#to_path] decryption_key Any #to_path capable object, assumed to be a file name.
          def initialize(namespace:, decryption_key: Lockbox.master_key)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')

@@ -4,10 +4,25 @@ require 'spec_helper'
 
 module Dirt
    describe Envelope do
-      let(:default_lockbox_key) { '0000000000000000000000000000000000000000000000000000000000000000' }
+      let(:default_lockbox_key) { '0' * 64 }
+      let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
 
       it 'should have a version number' do
          expect(Dirt::Envelope::VERSION).not_to be nil
+      end
+
+      describe '.new' do
+         it 'should alias Envelope::Envelope.new' do
+            configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
+            configs_dir.mkpath
+            configs_file = configs_dir / 'config.yml'
+            secrets_file = configs_dir / 'secrets.yml'
+
+            configs_file.write '---'
+            secrets_file.write lockbox.encrypt('---')
+
+            expect(Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)).to be_a Envelope::Envelope
+         end
       end
 
       describe '.override' do
@@ -27,8 +42,7 @@ module Dirt
             secrets_file = configs_dir / 'secrets.yml'
 
             configs_file.write config_content
-            box = Lockbox.new(key: default_lockbox_key)
-            secrets_file.write box.encrypt <<~YML
+            secrets_file.write lockbox.encrypt <<~YML
                ---
             YML
          end
@@ -65,15 +79,12 @@ module Dirt
 
    module Envelope
       describe Envelope do
-         let(:default_lockbox_key) { '0000000000000000000000000000000000000000000000000000000000000000' }
+         let(:default_lockbox_key) { '0' * 64 }
+         let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
          let(:clear_yaml) do
             <<~YML
                ---
             YML
-         end
-         # This is the encrypted version of a triple-dash empty YAML file under the testing all-zeroes key
-         let(:encrypted_yaml) do
-            "\xF6\xA6qMs5\x0F\x1Fl\xDAS\xE5\xE1x\x8B\x82\xA2^\xF5\x8B%\xDB\x06\xEA$T/\xCF\x14\x98\x9C\xB1"
          end
 
          describe '#initialize' do
@@ -91,7 +102,7 @@ module Dirt
 
                secrets_path = Pathname.new('~/.config/test-app/secrets.yml').expand_path
                secrets_path.dirname.mkpath
-               secrets_path.write encrypted_yaml
+               secrets_path.write lockbox.encrypt clear_yaml
 
                envelope = described_class.new namespace: 'test-app', decryption_key: default_lockbox_key
 
@@ -180,7 +191,7 @@ module Dirt
                      config_path.dirname.mkpath
                      config_path.write clear_yaml
 
-                     secrets_path.write encrypted_yaml
+                     secrets_path.write lockbox.encrypt clear_yaml
                   end
 
                   it 'should NOT ask for it from STDIN' do
@@ -240,7 +251,8 @@ module Dirt
                         # Could have gotten fancy and calculate it, but tests should be clear.
                         # Testing each mode segment individually and not testing the combos because that is a bit slow
                         # and redundant.
-                        illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world
+                        # Each is an octal mode triplet [User, Group, Others].
+                        illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
                                          0o000, 0o010, 0o020, 0o030, 0o040, 0o050, 0o060, 0o070, # group
                                          0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
                         illegal_modes.each do |mode|
@@ -271,7 +283,7 @@ module Dirt
                      config_path.dirname.mkpath
                      config_path.write clear_yaml
 
-                     secrets_path.write encrypted_yaml
+                     secrets_path.write lockbox.encrypt clear_yaml
                   end
 
                   around(:each) do |example|
@@ -371,9 +383,8 @@ module Dirt
                   location: 'Moria'
                YML
 
-               box = Lockbox.new(key: default_lockbox_key)
                secrets_path.dirname.mkpath
-               secrets_path.write box.encrypt <<~YML
+               secrets_path.write lockbox.encrypt <<~YML
                   ---
                   pass: 'mellon'
                YML
