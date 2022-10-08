@@ -11,11 +11,14 @@ Gem::Specification.new do |spec|
    spec.authors = ['Robin Miller']
    spec.email   = ['robin@tenjin.ca']
 
-   spec.summary     = 'Robust standard for config files.'
-   spec.description = 'Locates and loads configs files based on XDG standard.'
-   spec.homepage    = 'https://github.com/TenjinInc/dirt-envelope'
-   spec.license     = 'MIT'
-   spec.metadata    = {
+   spec.summary     = 'Single source of truth for environmental configuration.'
+   spec.description = <<~DESC
+      Locates and loads config YAML files based on XDG standard with the encrypted secrets file kept separately.
+      Includes useful rake tasks to make management easier. No code execution in config. Rails-independent.
+   DESC
+   spec.homepage = 'https://github.com/TenjinInc/dirt-envelope'
+   spec.license  = 'MIT'
+   spec.metadata = {
          'rubygems_mfa_required' => 'true'
    }
 
