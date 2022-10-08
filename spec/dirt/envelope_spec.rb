@@ -76,11 +76,6 @@ module Dirt
             "\xF6\xA6qMs5\x0F\x1Fl\xDAS\xE5\xE1x\x8B\x82\xA2^\xF5\x8B%\xDB\x06\xEA$T/\xCF\x14\x98\x9C\xB1"
          end
 
-         around(:each) do |example|
-            Lockbox.master_key = default_lockbox_key
-            example.run
-         end
-
          describe '#initialize' do
             it 'should explode when namespace missing' do
                expect { described_class.new }.to raise_error ArgumentError, 'missing keyword: :namespace'
@@ -98,7 +93,7 @@ module Dirt
                secrets_path.dirname.mkpath
                secrets_path.write encrypted_yaml
 
-               envelope = described_class.new namespace: 'test-app'
+               envelope = described_class.new namespace: 'test-app', decryption_key: default_lockbox_key
 
                expect(envelope).to be_frozen
             end
@@ -149,7 +144,7 @@ module Dirt
 
                   it 'should explode' do
                      expect do
-                        described_class.new namespace: name
+                        described_class.new namespace: name, decryption_key: default_lockbox_key
                      end.to raise_error MissingSecretsFileError, start_with('No secrets file found.')
                   end
 
@@ -157,7 +152,7 @@ module Dirt
                      msg = 'Create encrypted secrets.yml in one of these locations'
 
                      expect do
-                        described_class.new namespace: name
+                        described_class.new namespace: name, decryption_key: default_lockbox_key
                      end.to raise_error MissingSecretsFileError, include(msg)
                   end
 
@@ -168,13 +163,13 @@ module Dirt
                      xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
 
                      expect do
-                        described_class.new namespace: name
+                        described_class.new namespace: name, decryption_key: default_lockbox_key
                      end.to raise_error MissingSecretsFileError, include(xdg_config_home.expand_path.to_s)
                                                                        .and(include(xdg_config_dirs.join(', ')))
                   end
                end
 
-               context 'Lockbox master key defined' do
+               context 'encryption key defined' do
                   let(:name) { 'test-app' }
 
                   let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
@@ -185,28 +180,27 @@ module Dirt
                      config_path.write clear_yaml
 
                      secrets_path.write encrypted_yaml
-                  end
-
-                  around(:each) do |example|
-                     # store original values
-                     old_key = Lockbox.master_key
-
-                     # actual test setup
-                     Lockbox.master_key = default_lockbox_key
-                     example.run
-
-                     # reset original values
-                     Lockbox.master_key = old_key
                   end
 
                   it 'should NOT ask for it from STDIN' do
                      expect do
+                        described_class.new namespace: name, decryption_key: default_lockbox_key
+                     end.to_not output.to_stderr
+                  end
+
+                  it 'should default to the Lockbox master key' do
+                     old_key            = Lockbox.master_key
+                     Lockbox.master_key = default_lockbox_key
+
+                     expect do
                         described_class.new namespace: name
                      end.to_not output.to_stderr
+
+                     Lockbox.master_key = old_key
                   end
                end
 
-               context 'Lockbox master key undefined' do
+               context 'encrpytion key missing' do
                   let(:name) { 'test-app' }
 
                   let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
@@ -220,49 +214,42 @@ module Dirt
                   end
 
                   around(:each) do |example|
-                     # store original values
-                     old_key = Lockbox.master_key
-
-                     # actual test setup
+                     old_key            = Lockbox.master_key
                      Lockbox.master_key = nil
                      example.run
-
-                     # reset original values
                      Lockbox.master_key = old_key
                   end
 
-                  context 'STDIN can #noecho' do
-                     it 'should ask for it from STDIN' do
-                        msg = 'Enter master key to decrypt'
+                  it 'should ask for it from STDIN' do
+                     msg = 'Enter master key to decrypt'
 
-                        expect do
-                           $stdin = double('fake IO', noecho: default_lockbox_key)
-                           described_class.new namespace: name
-                           $stdin = STDIN
-                        end.to output(start_with(msg)).to_stderr
-                     end
-
-                     it 'should mention the file it is decrypting' do
-                        path = Pathname.new('~/.config/') / name / 'secrets.yml'
-
-                        expect do
-                           $stdin = double('fake IO', noecho: default_lockbox_key)
-                           described_class.new namespace: name
-                           $stdin = STDIN
-                        end.to output(include(path.expand_path.to_s)).to_stderr
-                     end
-
-                     it 'should read the password from STDIN without echo' do
-                        input = double('fake input')
-
-                        $stdin = input
-
-                        expect(input).to receive(:noecho).and_return default_lockbox_key
-
+                     expect do
+                        $stdin = double('fake IO', noecho: default_lockbox_key)
                         described_class.new namespace: name
-
                         $stdin = STDIN
-                     end
+                     end.to output(start_with(msg)).to_stderr
+                  end
+
+                  it 'should mention the file it is decrypting' do
+                     path = Pathname.new('~/.config/') / name / 'secrets.yml'
+
+                     expect do
+                        $stdin = double('fake IO', noecho: default_lockbox_key)
+                        described_class.new namespace: name
+                        $stdin = STDIN
+                     end.to output(include(path.expand_path.to_s)).to_stderr
+                  end
+
+                  it 'should read the password from STDIN without echo' do
+                     input = double('fake input')
+
+                     $stdin = input
+
+                     expect(input).to receive(:noecho).and_return default_lockbox_key
+
+                     described_class.new namespace: name
+
+                     $stdin = STDIN
                   end
 
                   context 'STDIN cannot #noecho' do
@@ -308,7 +295,7 @@ module Dirt
          # information and how carefully to treat it. It also causes an explicit reminder that secrets are secret.
          describe '#/' do
             let(:name) { 'test-app' }
-            let(:envelope) { described_class.new namespace: name }
+            let(:envelope) { described_class.new namespace: name, decryption_key: default_lockbox_key }
             let(:configs_path) { Pathname.new('~/.config/test-app/config.yml').expand_path }
             let(:secrets_path) { Pathname.new('~/.config/test-app/secrets.yml').expand_path }
 
