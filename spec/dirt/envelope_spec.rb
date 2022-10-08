@@ -172,10 +172,11 @@ module Dirt
                context 'encryption key defined' do
                   let(:name) { 'test-app' }
 
-                  let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
+                  let(:configs_dir) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name }
+                  let(:secrets_path) { configs_dir / 'secrets.yml' }
 
                   before(:each) do
-                     config_path = Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'config.yml'
+                     config_path = configs_dir / 'config.yml'
                      config_path.dirname.mkpath
                      config_path.write clear_yaml
 
@@ -197,6 +198,66 @@ module Dirt
                      end.to_not output.to_stderr
 
                      Lockbox.master_key = old_key
+                  end
+
+                  # key file is activated when passing a Pathname
+                  context 'key file' do
+                     let(:key_file) { Pathname.new('master_key') }
+                     let(:key_path) { configs_dir / key_file }
+
+                     before(:each) do
+                        key_path.write default_lockbox_key
+                        key_path.chmod 0o0600 # u+rw,go-a
+                     end
+
+                     it 'should read from a Pathname key file' do
+                        expect do
+                           described_class.new namespace: name, decryption_key: key_file
+                        end.to_not output.to_stderr
+                     end
+
+                     it 'should complain when keyfile missing' do
+                        key_path.delete
+
+                        expect do
+                           described_class.new namespace: name, decryption_key: key_file
+                        end.to raise_error SecretsFileDecryptionError,
+                                           include("Could not find file 'master_key'").and(include('Searched in'))
+                     end
+
+                     it 'should NOT complain when keyfile has proper permissions' do
+                        [0o400, 0o600].each do |mode|
+                           key_path.chmod(mode)
+
+                           expect do
+                              described_class.new namespace: name, decryption_key: key_file
+                           end.to_not raise_error
+                        end
+                     end
+
+                     context 'improper permissions' do
+                        # Generating each test instance separately to be very explicit about each one being tested.
+                        # Could have gotten fancy and calculate it, but tests should be clear.
+                        # Testing each mode segment individually and not testing the combos because that is a bit slow
+                        # and redundant.
+                        illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world
+                                         0o000, 0o010, 0o020, 0o030, 0o040, 0o050, 0o060, 0o070, # group
+                                         0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
+                        illegal_modes.each do |mode|
+                           it "should complain when keyfile has mode #{ format('%04o', mode) }" do
+                              key_path.chmod(mode)
+
+                              # '%04o' is string formatter speak for "4-digit octal"
+                              msg = format("File '%<path>s' has improper permissions (%<mode>04o).",
+                                           path: key_path, mode: mode)
+
+                              expect do
+                                 described_class.new namespace: name, decryption_key: key_file
+                              end.to raise_error SecretsFileDecryptionError,
+                                                 include(msg).and(include('chmod'))
+                           end
+                        end
+                     end
                   end
                end
 

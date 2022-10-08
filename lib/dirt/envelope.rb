@@ -12,6 +12,9 @@ module Dirt
    # ENVelope
    module Envelope
       class Envelope
+         # Allowed permissions modes for lockfile. Readable or read-writable by the current user only
+         ALLOWED_LOCKFILE_MODES = [0o600, 0o400].freeze
+
          def initialize(namespace:, decryption_key: Lockbox.master_key)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
@@ -32,8 +35,6 @@ module Dirt
 
             freeze
 
-            # TODO: setting & runninng override block should have some guards around it that raise if called after freezing
-            #       (with a better error msg, hint that it must be set) or if called too early
             # instance_eval(&self.class.__override_block__)
             self.class.__override_block__&.call(self)
          end
@@ -82,13 +83,9 @@ module Dirt
          def load_secrets(locator, decryption_key)
             file = locator.find('secrets', EXT::YAML)
 
-            if decryption_key.nil? && $stdin.respond_to?(:noecho)
-               warn "Enter master key to decrypt #{ file }:"
-               decryption_key = $stdin.noecho(&:gets).strip
-            end
-
             lockbox = begin
-                         Lockbox.new(key: decryption_key)
+                         Lockbox.new(key: resolve_key(decryption_key, locator,
+                                                      "Enter master key to decrypt #{ file }:"))
                       rescue ArgumentError => e
                          raise SecretsFileDecryptionError, e
                       end
@@ -108,6 +105,41 @@ module Dirt
 
          def parse(file_data)
             YAML.safe_load(file_data, symbolize_names: true) || {}
+         end
+
+         def resolve_key(decryption_key, locator, prompt)
+            if decryption_key.nil? && $stdin.respond_to?(:noecho)
+               warn prompt
+               $stdin.noecho(&:gets).strip
+            elsif decryption_key.is_a? Pathname
+               read_keyfile(locator, decryption_key)
+            else
+               decryption_key
+            end
+         end
+
+         def read_keyfile(locator, path)
+            key_file = begin
+                          locator.find(path)
+                       rescue FileLocator::FileNotFoundError
+                          raise SecretsFileDecryptionError,
+                                "Could not find file '#{ path }'. Searched in: #{ locator.search_paths }"
+                       end
+
+            permissions_mask = 0o777 # only the lowest three digits are perms, so masking
+            stat             = key_file.stat
+            file_mode        = stat.mode & permissions_mask
+            # TODO: use stat.world_readable? etc instead
+            unless ALLOWED_LOCKFILE_MODES.include? file_mode
+               hint = "Try: chmod 600 #{ key_file }"
+               raise SecretsFileDecryptionError,
+                     format("File '%<path>s' has improper permissions (%<mode>04o). %<hint>s",
+                            path: key_file,
+                            mode: file_mode,
+                            hint: hint)
+            end
+
+            key_file.read
          end
       end
 
