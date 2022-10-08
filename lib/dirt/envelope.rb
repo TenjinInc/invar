@@ -23,13 +23,29 @@ module Dirt
          # Allowed permissions modes for lockfile. Readable or read-writable by the current user only
          ALLOWED_LOCKFILE_MODES = [0o600, 0o400].freeze
 
+         # Name of the default key file to be searched for within config directories
+         DEFAULT_KEY_FILE_NAME = 'master_key'
+
          # Constructs a new Envelope.
          #
-         # Do NOT hardcode your encryption key.
+         # It will search for config, secrets, and decryption key files using the XDG specification.
+         #
+         # The secrets file is decrypted using Lockbox. The key will be requested from these locations in order:
+         #
+         #    1. the Lockbox.master_key variable
+         #    2. the LOCKBOX_MASTER_KEY environment variable.
+         #    3. saved in a secure key file (recommended)
+         #    4. manual terminal prompt entry (recommended)
+         #
+         # The :decryption_keyfile argument specifies the filename to read for option 3. It will be searched for in
+         # the same XDG locations as the secrets file. The decryption keyfile will be checked for safe permission modes.
+         #
+         # NEVER hardcode your encryption key. This class intentionally does not accept a raw string of your decryption
+         # key to discourage hardcoding your encryption key and committing it to version control.
          #
          # @param [String] namespace name of the subdirectory within XDG locations
-         # @param [#to_path] decryption_key Any #to_path capable object, assumed to be a file name.
-         def initialize(namespace:, decryption_key: Lockbox.master_key)
+         # @param [#to_path] decryption_keyfile Any #to_path capable object referring to the decryption key file
+         def initialize(namespace:, decryption_keyfile: nil)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
 
@@ -41,7 +57,7 @@ module Dirt
             end
 
             begin
-               @secrets = Scope.new(load_secrets(locator, decryption_key))
+               @secrets = Scope.new(load_secrets(locator, decryption_keyfile || DEFAULT_KEY_FILE_NAME))
             rescue FileLocator::FileNotFoundError
                raise MissingSecretsFileError,
                      "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
@@ -94,13 +110,13 @@ module Dirt
             configs.merge(env)
          end
 
-         def load_secrets(locator, decryption_key)
+         def load_secrets(locator, decryption_keyfile)
             file = locator.find('secrets', EXT::YAML)
 
             lockbox = begin
-                         Lockbox.new(key: resolve_key(decryption_key, locator,
-                                                      "Enter master key to decrypt #{ file }:"))
-                      rescue ArgumentError => e
+                         Lockbox.new(key: Lockbox.master_key || resolve_key(decryption_keyfile, locator,
+                                                                            "Enter master key to decrypt #{ file }:"))
+                      rescue Lockbox::Error => e
                          raise SecretsFileDecryptionError, e
                       end
 
@@ -119,25 +135,23 @@ module Dirt
             YAML.safe_load(file_data, symbolize_names: true) || {}
          end
 
-         def resolve_key(decryption_key, locator, prompt)
-            if decryption_key.nil? && $stdin.respond_to?(:noecho)
+         def resolve_key(pathname, locator, prompt)
+            key_file = locator.find(pathname)
+
+            # if key_file.respond_to? :to_path
+            read_keyfile(key_file)
+            # end
+         rescue FileLocator::FileNotFoundError
+            if $stdin.respond_to?(:noecho)
                warn prompt
                $stdin.noecho(&:gets).strip
-            elsif decryption_key.respond_to? :to_path
-               read_keyfile(locator, decryption_key)
             else
-               decryption_key
+               raise SecretsFileDecryptionError,
+                     "Could not find file '#{ pathname }'. Searched in: #{ locator.search_paths }"
             end
          end
 
-         def read_keyfile(locator, pathname)
-            key_file = begin
-                          locator.find(pathname.to_path)
-                       rescue FileLocator::FileNotFoundError
-                          raise SecretsFileDecryptionError,
-                                "Could not find file '#{ pathname }'. Searched in: #{ locator.search_paths }"
-                       end
-
+         def read_keyfile(key_file)
             permissions_mask = 0o777 # only the lowest three digits are perms, so masking
             stat             = key_file.stat
             file_mode        = stat.mode & permissions_mask

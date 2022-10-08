@@ -17,11 +17,15 @@ module Dirt
             configs_dir.mkpath
             configs_file = configs_dir / 'config.yml'
             secrets_file = configs_dir / 'secrets.yml'
+            key_file     = configs_dir / 'master_key'
 
             configs_file.write '---'
             secrets_file.write lockbox.encrypt('---')
 
-            expect(Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)).to be_a Envelope::Envelope
+            key_file.write default_lockbox_key
+            key_file.chmod 0o600
+
+            expect(Envelope.new(namespace: 'test-app')).to be_a Envelope::Envelope
          end
       end
 
@@ -40,11 +44,14 @@ module Dirt
             configs_dir.mkpath
             configs_file = configs_dir / 'config.yml'
             secrets_file = configs_dir / 'secrets.yml'
+            key_file     = configs_dir / 'master_key'
 
             configs_file.write config_content
             secrets_file.write lockbox.encrypt <<~YML
                ---
             YML
+            key_file.write default_lockbox_key
+            key_file.chmod 0o600
          end
 
          after(:each) do
@@ -59,7 +66,7 @@ module Dirt
             Envelope.after_load do |envelope|
                (envelope / :config / :database).override name: new_db_name
             end
-            envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
+            envelope = Envelope::Envelope.new(namespace: 'test-app')
 
             expect(envelope / :configs / :database / :name).to eq new_db_name
          end
@@ -70,7 +77,7 @@ module Dirt
             Envelope.after_load do |envelope|
                (envelope / :config / :database).override name: new_db_name
             end
-            envelope = Envelope::Envelope.new(namespace: 'test-app', decryption_key: default_lockbox_key)
+            envelope = Envelope::Envelope.new(namespace: 'test-app')
 
             expect(envelope / :configs / :database / :hostname).to eq 'localhost'
          end
@@ -96,15 +103,20 @@ module Dirt
             # and just general state & behaviour predictability.
             # It does not, however, guarantee the actual stored values are also frozen.
             it 'should freeze the ENVelope after creation' do
-               config_path = Pathname.new('~/.config/test-app/config.yml').expand_path
+               configs_dir = Pathname.new('~/.config/test-app').expand_path
+               config_path = configs_dir / 'config.yml'
                config_path.dirname.mkpath
                config_path.write clear_yaml
 
-               secrets_path = Pathname.new('~/.config/test-app/secrets.yml').expand_path
+               secrets_path = configs_dir / 'secrets.yml'
                secrets_path.dirname.mkpath
                secrets_path.write lockbox.encrypt clear_yaml
 
-               envelope = described_class.new namespace: 'test-app', decryption_key: default_lockbox_key
+               key_file = configs_dir / 'master_key'
+               key_file.write default_lockbox_key
+               key_file.chmod 0o600
+
+               envelope = described_class.new namespace: 'test-app'
 
                expect(envelope).to be_frozen
             end
@@ -142,11 +154,16 @@ module Dirt
             end
 
             context 'secrets file' do
-               context 'secrets file missing' do
-                  let(:name) { 'my-app' }
+               let(:name) { 'test-app' }
+               let(:configs_dir) { Pathname.new('~/.config/').expand_path / name }
 
+               before(:each) do
+                  configs_dir.mkpath
+               end
+
+               context 'secrets file missing' do
                   before(:each) do
-                     config_path = Pathname.new('~/.config/my-app/config.yml').expand_path
+                     config_path = configs_dir / 'config.yml'
                      config_path.dirname.mkpath
                      config_path.write <<~YML
                         ---
@@ -155,7 +172,7 @@ module Dirt
 
                   it 'should explode' do
                      expect do
-                        described_class.new namespace: name, decryption_key: default_lockbox_key
+                        described_class.new namespace: name
                      end.to raise_error MissingSecretsFileError, start_with('No secrets file found.')
                   end
 
@@ -163,18 +180,18 @@ module Dirt
                      msg = 'Create encrypted secrets.yml in one of these locations'
 
                      expect do
-                        described_class.new namespace: name, decryption_key: default_lockbox_key
+                        described_class.new namespace: name
                      end.to raise_error MissingSecretsFileError, include(msg)
                   end
 
-                  it 'should state the locations searched' do
+                  it ' should state the locations searched ' do
                      xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)) / name
 
                      xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', '/something:/someplace')
                      xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
 
                      expect do
-                        described_class.new namespace: name, decryption_key: default_lockbox_key
+                        described_class.new namespace: name
                      end.to raise_error MissingSecretsFileError, include(xdg_config_home.expand_path.to_s)
                                                                        .and(include(xdg_config_dirs.join(', ')))
                   end
@@ -196,7 +213,7 @@ module Dirt
 
                   it 'should NOT ask for it from STDIN' do
                      expect do
-                        described_class.new namespace: name, decryption_key: default_lockbox_key
+                        described_class.new namespace: name
                      end.to_not output.to_stderr
                   end
 
@@ -211,71 +228,57 @@ module Dirt
                      Lockbox.master_key = old_key
                   end
 
-                  # key file is activated when passing a Pathname
-                  context 'key file' do
-                     let(:key_file) { Pathname.new('master_key') }
-                     let(:key_path) { configs_dir / key_file }
+                  let(:key_file) { Pathname.new('master_key') }
+                  let(:key_path) { configs_dir / key_file }
 
-                     before(:each) do
-                        key_path.write default_lockbox_key
-                        key_path.chmod 0o0600 # u+rw,go-a
-                     end
+                  before(:each) do
+                     key_path.write default_lockbox_key
+                     key_path.chmod 0o0600 # u+rw,go-a
+                  end
 
-                     it 'should read from a Pathname key file' do
+                  it 'should read from a Pathname key file' do
+                     expect do
+                        described_class.new namespace: name, decryption_keyfile: key_file
+                     end.to_not output.to_stderr
+                  end
+
+                  it 'should NOT complain when keyfile has proper permissions' do
+                     [0o400, 0o600].each do |mode|
+                        key_path.chmod(mode)
+
                         expect do
-                           described_class.new namespace: name, decryption_key: key_file
-                        end.to_not output.to_stderr
+                           described_class.new namespace: name, decryption_keyfile: key_file
+                        end.to_not raise_error
                      end
+                  end
 
-                     it 'should complain when keyfile missing' do
-                        key_path.delete
-
-                        expect do
-                           described_class.new namespace: name, decryption_key: key_file
-                        end.to raise_error SecretsFileDecryptionError,
-                                           include("Could not find file 'master_key'").and(include('Searched in'))
-                     end
-
-                     it 'should NOT complain when keyfile has proper permissions' do
-                        [0o400, 0o600].each do |mode|
+                  context 'improper permissions' do
+                     # Generating each test instance separately to be very explicit about each one being tested.
+                     # Could have gotten fancy and calculate it, but tests should be clear.
+                     # Testing each mode segment individually and not testing the combos because that is a bit slow
+                     # and redundant.
+                     # Each is an octal mode triplet [User, Group, Others].
+                     illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
+                                      0o000, 0o010, 0o020, 0o030, 0o040, 0o050, 0o060, 0o070, # group
+                                      0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
+                     illegal_modes.each do |mode|
+                        it "should complain when keyfile has mode #{ format('%04o', mode) }" do
                            key_path.chmod(mode)
 
+                           # '%04o' is string formatter speak for "4-digit octal"
+                           msg = format("File '%<path>s' has improper permissions (%<mode>04o).",
+                                        path: key_path, mode: mode)
+
                            expect do
-                              described_class.new namespace: name, decryption_key: key_file
-                           end.to_not raise_error
-                        end
-                     end
-
-                     context 'improper permissions' do
-                        # Generating each test instance separately to be very explicit about each one being tested.
-                        # Could have gotten fancy and calculate it, but tests should be clear.
-                        # Testing each mode segment individually and not testing the combos because that is a bit slow
-                        # and redundant.
-                        # Each is an octal mode triplet [User, Group, Others].
-                        illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
-                                         0o000, 0o010, 0o020, 0o030, 0o040, 0o050, 0o060, 0o070, # group
-                                         0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
-                        illegal_modes.each do |mode|
-                           it "should complain when keyfile has mode #{ format('%04o', mode) }" do
-                              key_path.chmod(mode)
-
-                              # '%04o' is string formatter speak for "4-digit octal"
-                              msg = format("File '%<path>s' has improper permissions (%<mode>04o).",
-                                           path: key_path, mode: mode)
-
-                              expect do
-                                 described_class.new namespace: name, decryption_key: key_file
-                              end.to raise_error SecretsFileDecryptionError,
-                                                 include(msg).and(include('chmod'))
-                           end
+                              described_class.new namespace: name, decryption_keyfile: key_file
+                           end.to raise_error SecretsFileDecryptionError,
+                                              include(msg).and(include('chmod'))
                         end
                      end
                   end
                end
 
                context 'encryption key missing' do
-                  let(:name) { 'test-app' }
-
                   let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
 
                   before(:each) do
@@ -347,23 +350,39 @@ module Dirt
                end
 
                it 'should reraise decryption errors with additional information' do
-                  name        = 'test-app'
-                  configs_dir = Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name
-                  configs_dir.mkpath
-
                   config_path = configs_dir / 'config.yml'
                   config_path.write clear_yaml
 
                   secrets_path = configs_dir / 'secrets.yml'
                   secrets_path.write 'badly-encrypted-content'
 
+                  key_path = configs_dir / 'master_key'
+                  key_path.write default_lockbox_key
+                  key_path.chmod 0o600
+
                   msg  = 'Failed to open'
                   hint = 'Perhaps you used the wrong file decryption key?'
 
                   expect do
-                     described_class.new(namespace: name, decryption_key: default_lockbox_key)
+                     described_class.new(namespace: name)
                   end.to raise_error(SecretsFileDecryptionError,
                                      include(msg).and(include(secrets_path.to_s)).and(include(hint)))
+               end
+
+               it 'should reraise key argument errors' do
+                  config_path = configs_dir / 'config.yml'
+                  config_path.write clear_yaml
+
+                  secrets_path = configs_dir / 'secrets.yml'
+                  secrets_path.write lockbox.encrypt clear_yaml
+
+                  key_path = configs_dir / 'master_key'
+                  FileUtils.touch key_path # empty is invalid length key
+                  key_path.chmod 0o600
+
+                  expect do
+                     described_class.new namespace: name
+                  end.to raise_error SecretsFileDecryptionError
                end
             end
          end
@@ -372,9 +391,11 @@ module Dirt
          # information and how carefully to treat it. It also causes an explicit reminder that secrets are secret.
          describe '#/' do
             let(:name) { 'test-app' }
-            let(:envelope) { described_class.new namespace: name, decryption_key: default_lockbox_key }
-            let(:configs_path) { Pathname.new('~/.config/test-app/config.yml').expand_path }
-            let(:secrets_path) { Pathname.new('~/.config/test-app/secrets.yml').expand_path }
+            let(:envelope) { described_class.new namespace: name }
+            let(:configs_dir) { Pathname.new('~/.config/test-app').expand_path }
+            let(:key_path) { configs_dir / 'master_key' }
+            let(:configs_path) { configs_dir / 'config.yml' }
+            let(:secrets_path) { configs_dir / 'secrets.yml' }
 
             before(:each) do
                configs_path.dirname.mkpath
@@ -388,6 +409,9 @@ module Dirt
                   ---
                   pass: 'mellon'
                YML
+
+               key_path.write default_lockbox_key
+               key_path.chmod 0o600
             end
 
             it 'should have a :config base scope' do
