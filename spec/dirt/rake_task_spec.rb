@@ -11,6 +11,9 @@ describe 'Rake Tasks' do
 
    before(:each) do
       task.reenable
+
+      # Prevent it from opening actual editor
+      allow_any_instance_of(Dirt::Envelope::RakeTasks::NamespacedTask).to receive(:system)
    end
 
    context 'envelope:configs:create' do
@@ -25,8 +28,10 @@ describe 'Rake Tasks' do
       end
 
       it 'should explode if the namespace argument is missing' do
-         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error ArgumentError, msg
+         msg  = 'Namespace argument required'
+         hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+                                               include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
@@ -87,11 +92,6 @@ describe 'Rake Tasks' do
    context 'envelope:configs:edit' do
       let(:task) { ::Rake::Task['envelope:configs:edit'] }
 
-      before(:each) do
-         # Prevent it from opening actual editor
-         allow(Dirt::Envelope::RakeTasks).to receive(:system)
-      end
-
       it 'should define a configs edit task' do
          expect(::Rake::Task.task_defined?('envelope:configs:edit')).to be true
       end
@@ -101,8 +101,9 @@ describe 'Rake Tasks' do
       end
 
       it 'should explode if the namespace argument is missing' do
-         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error ArgumentError, msg
+         msg  = 'Namespace argument required.'
+         hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError, include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
@@ -116,7 +117,7 @@ describe 'Rake Tasks' do
 
          it 'should edit the config file in the XDG_CONFIG_HOME path' do
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect(Dirt::Envelope::RakeTasks).to receive(:system).with('editor', config_path.to_s, exception: true)
+            expect_any_instance_of(Dirt::Envelope::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
             task.invoke(name)
          end
@@ -166,7 +167,7 @@ describe 'Rake Tasks' do
 
          it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect(Dirt::Envelope::RakeTasks).to receive(:system).with('editor', config_path.to_s, exception: true)
+            expect_any_instance_of(Dirt::Envelope::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
             task.invoke(name)
          end
@@ -200,8 +201,10 @@ describe 'Rake Tasks' do
       end
 
       it 'should explode if the namespace argument is missing' do
-         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error ArgumentError, msg
+         msg  = 'Namespace argument required.'
+         hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+                                               include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
@@ -228,7 +231,7 @@ describe 'Rake Tasks' do
          it 'should provide instructions for handling the secret' do
             expect do
                task.invoke(name)
-            end.to output(include(Dirt::Envelope::RakeTasks::SECRETS_INSTRUCTIONS)).to_stderr
+            end.to output(include(Dirt::Envelope::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
          end
 
          # this allows easier piping to a file or whatever
@@ -296,7 +299,7 @@ describe 'Rake Tasks' do
          it 'should provide instructions for handling the secret' do
             expect do
                task.invoke(name)
-            end.to output(include(Dirt::Envelope::RakeTasks::SECRETS_INSTRUCTIONS)).to_stderr
+            end.to output(include(Dirt::Envelope::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
          end
 
          # this allows easier piping to a file or whatever
@@ -345,8 +348,10 @@ describe 'Rake Tasks' do
       end
 
       it 'should explode if the namespace argument is missing' do
-         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error ArgumentError, msg
+         msg  = 'Namespace argument required.'
+         hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+                                               include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
@@ -478,7 +483,7 @@ describe 'Rake Tasks' do
             allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect(Dirt::Envelope::RakeTasks).to receive(:system).with('editor', '/tmp/whatever', exception: true)
+            expect_any_instance_of(Dirt::Envelope::RakeTasks::SecretTask).to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
             task.invoke(name)
          end
@@ -512,8 +517,10 @@ describe 'Rake Tasks' do
       let(:task) { ::Rake::Task['envelope:paths'] }
 
       it 'should explode if the namespace argument is missing' do
-         msg = "namespace argument required. Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error ArgumentError, msg
+         msg  = 'Namespace argument required.'
+         hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
+         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+                                               include(msg).and(include(hint))
       end
 
       it 'should report the search paths' do

@@ -11,28 +11,6 @@ require 'pathname'
 module Dirt
    # ENVelope
    module Envelope
-      class MissingConfigFileError < RuntimeError
-      end
-
-      class MissingSecretsFileError < RuntimeError
-      end
-
-      class SecretsFileEncryptionError < RuntimeError
-      end
-
-      class SecretsFileDecryptionError < RuntimeError
-      end
-
-      class EnvConfigCollisionError < RuntimeError
-         HINT = 'Either rename your config entry or remove the environment variable.'
-      end
-
-      # Raised when there are config or secrets files found at multiple locations. You can resolve this by deciding on
-      # one correct location and removing the alternate file(s).
-      class AmbiguousSourceError < RuntimeError
-         HINT = 'Choose 1 correct one and delete the others.'
-      end
-
       class Envelope
          def initialize(namespace:, decryption_key: Lockbox.master_key)
             locator      = FileLocator.new(namespace)
@@ -142,6 +120,35 @@ module Dirt
          def after_load(&block)
             ::Dirt::Envelope::Envelope.__override_block__ = block
          end
+      end
+
+      # Raised when no config file can be found within the search paths.
+      class MissingConfigFileError < RuntimeError
+      end
+
+      # Raised when no secrets file can be found within the search paths.
+      class MissingSecretsFileError < RuntimeError
+      end
+
+      # Raised when an error is encountered during secrets file encryption
+      class SecretsFileEncryptionError < RuntimeError
+      end
+
+      # Raised when an error is encountered during secrets file decryption
+      class SecretsFileDecryptionError < RuntimeError
+      end
+
+      # Raised when a key is defined in both the environment and the configuration file.
+      class EnvConfigCollisionError < RuntimeError
+         # Message hinting at possible solution
+         HINT = 'Either rename your config entry or remove the environment variable.'
+      end
+
+      # Raised when there are config or secrets files found at multiple locations. You can resolve this by deciding on
+      # one correct location and removing the alternate file(s).
+      class AmbiguousSourceError < RuntimeError
+         # Message hinting at possible solution
+         HINT = 'Choose 1 correct one and delete the others.'
       end
    end
 end

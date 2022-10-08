@@ -8,25 +8,25 @@ require_relative 'rake_tasks'
 namespace :envelope do
    namespace :configs do
       desc 'Create a new configuration file'
-      task :create, [:namespace] do |_task, args|
-         Dirt::Envelope::RakeTasks.create_config(args[:namespace])
+      task :create, [:namespace] do |task, args|
+         Dirt::Envelope::RakeTasks::ConfigTask.new(args[:namespace], task).create
       end
 
       desc 'Edit the config in your default editor'
-      task :edit, [:namespace] do |_task, args|
-         Dirt::Envelope::RakeTasks.edit_config(args[:namespace])
+      task :edit, [:namespace] do |task, args|
+         Dirt::Envelope::RakeTasks::ConfigTask.new(args[:namespace], task).edit
       end
    end
 
    namespace :secrets do
       desc 'Create a new encrypted secrets file'
-      task :create, [:namespace] do |_task, args|
-         Dirt::Envelope::RakeTasks.create_secret(args[:namespace])
+      task :create, [:namespace] do |task, args|
+         Dirt::Envelope::RakeTasks::SecretTask.new(args[:namespace], task).create
       end
 
       desc 'Edit the encrypted secrets file in your default editor'
-      task :edit, [:namespace] do |_task, args|
-         Dirt::Envelope::RakeTasks.edit_secret(args[:namespace])
+      task :edit, [:namespace] do |task, args|
+         Dirt::Envelope::RakeTasks::SecretTask.new(args[:namespace], task).edit
       end
    end
 
@@ -41,7 +41,7 @@ namespace :envelope do
    end
 
    desc 'Show directories to be searched for the given namespace'
-   task :paths, [:namespace] do |_task, args|
-      Dirt::Envelope::RakeTasks.show_paths(args[:namespace])
+   task :paths, [:namespace] do |task, args|
+      Dirt::Envelope::RakeTasks::StateTask.new(args[:namespace], task).show_paths
    end
 end
