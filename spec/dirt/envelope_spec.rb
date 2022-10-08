@@ -200,7 +200,7 @@ module Dirt
                   end
                end
 
-               context 'encrpytion key missing' do
+               context 'encryption key missing' do
                   let(:name) { 'test-app' }
 
                   let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
@@ -247,7 +247,9 @@ module Dirt
 
                      expect(input).to receive(:noecho).and_return default_lockbox_key
 
+                     $stderr = StringIO.new
                      described_class.new namespace: name
+                     $stderr = STDERR
 
                      $stdin = STDIN
                   end
@@ -261,10 +263,12 @@ module Dirt
                         $stdin = STDIN
                      end
 
-                     it 'should raise an error instead of asking from STDIN' do
+                     it 'should raise an error instead of asking' do
                         expect do
-                           described_class.new namespace: name
-                        end.to(raise_error(SecretsFileDecryptionError).and(output('').to_stderr))
+                           expect do
+                              described_class.new namespace: name
+                           end.to(raise_error(SecretsFileDecryptionError))
+                        end.to_not output.to_stderr
                      end
                   end
                end

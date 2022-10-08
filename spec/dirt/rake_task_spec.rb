@@ -16,6 +16,15 @@ describe 'Rake Tasks' do
       allow_any_instance_of(Dirt::Envelope::RakeTasks::NamespacedTask).to receive(:system)
    end
 
+   # Silencing the terminal output because there is a lot of it
+   around(:each) do |example|
+      $stdout = StringIO.new
+      $stderr = StringIO.new
+      example.run
+      $stdout = STDOUT
+      $stderr = STDERR
+   end
+
    context 'envelope:configs:create' do
       let(:task) { ::Rake::Task['envelope:configs:create'] }
 
