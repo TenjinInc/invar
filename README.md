@@ -27,7 +27,7 @@ Here's what this project aims to do:
 * Secrets encrypted using [Lockbox](https://github.com/ankane/lockbox)
 * Access ENV variables using symbols or case-insensitive strings.
 * Helpful Rake tasks
-* Meaningful error messages
+* Meaningful error messages with suggestions
 * Immutable
 
 ### Anti-Features
@@ -86,10 +86,12 @@ or
 
 ### Configurations
 
-Configurations are values that change based on the *system* the app is installed on. Examples include:
+Configurations are values that depend on the *local system environment*. They do not generally change depending on what
+you're *doing*. Examples include:
 
 * Database name
 * API options
+* Gem or library configurations
 
 ### Secrets
 
@@ -97,6 +99,13 @@ This is stuff you don't want to be read by anyone. Rails calls this concept "cre
 
 * Usernames and passwords
 * API keys
+
+**This is not a replacement for a password-manager**. Use a
+proper [password sharing tool](https://en.wikipedia.org/wiki/List_of_password_managers) as the primary method for
+sharing passwords within your team. This is especially true for the master encryption key used to secure the secrets
+file.
+
+Similarly, you should use a unique encryption key for each environment (eg. your development laptop vs a server).
 
 ## Installation
 
@@ -111,6 +120,55 @@ And then run in a terminal:
     bundle install
 
 ## Usage
+
+### Rake Tasks
+
+In your `Rakefile`, add:
+
+```ruby
+require 'dirt/envelope/rake'
+```
+
+Then you can use the rake tasks as reported by `rake -T`
+
+#### Show Search Paths
+
+This will show you the XDG search locations.
+
+    bundle exec rake envelope:paths
+
+#### Create Config File
+
+    bundle exec rake envelope:create:configs
+
+If a config file already exists in any of the search path locations, it will yell at you.
+
+#### Edit Config File
+
+    bundle exec rake envelope:edit:configs
+
+#### Create Secrets File
+
+To create the config file, run this in a terminal:
+
+    bundle exec rake envelope:create:secrets
+
+It will print out the generated master key. Save it to a password manager.
+
+If you do not want it to be displayed (eg. you're in public), you can pipe it to a file:
+
+    bundle exec rake envelope:create:secrets > master_key
+
+Then handle the `master_key` file as needed.
+
+#### Edit Secrets File
+
+To edit the secrets file, run this and provide the file's encryption key:
+
+    bundle exec rake envelope:edit:secrets
+
+The file will be decrypted and opened in your default editor (eg. nano). Once you have exited the editor, it will be
+re-encrypted (remember to save, too!).
 
 ### Code
 
@@ -139,10 +197,13 @@ require 'dirt/envelope'
 
 envelope = Dirt::Envelope.new 'my-app'
 
-# Prints "my_app_development" 
+# Use the slash operator to fetch values (sort of like Pathname)
 puts envelope / :config / :database / :host
 
-# Prints "my_app" 
+# String keys are okay, too. Also it's case-insensitive
+puts envelope / 'config' / 'database' / 'host'
+
+# Secrets are kept in a separate tree 
 puts envelope / :secret / :database / :username
 
 # And you can get ENV variables. This should print your HOME directory.
@@ -152,32 +213,17 @@ puts envelope / :config / :home
 puts envelope[:config][:database][:host]
 ```
 
-### Rake Tasks
+> **FAQ**: Why not support a dot syntax like `envelope.config.database.host`?
+>
+> Because key names could collide with method names, like `inspect`, `dup`, or `tap`.
 
-#### Configs
+### Custom Locations
 
-To create the config file, run this in a terminal:
+You can customize the search paths by setting the environment variables `XDG_CONFIG_HOME` and/or `XDG_CONFIG_DIRS` any
+time you run a Rake task or your application.
 
-    bundle exec rake envelope:create:configs
-
-If a config file already exists in any of the search path locations, it will yell at you.
-
-To edit the config file, run this in a terminal:
-
-    bundle exec rake envelope:edit:configs
-
-#### Secrets
-
-To create the config file, run this in a terminal:
-
-    bundle exec rake envelope:create:secrets
-
-To edit the secrets file, run this and provide the file's encryption key:
-
-    bundle exec rake envelope:edit:secrets
-
-It will then open the decrypted file your default editor (eg. nano). Once you have saved the file, it will be
-re-encrypted.
+    # Looks in /tmp instead of ~/.config/ 
+    XDG_CONFIG_HOME=/tmp bundle exec rake envelope:paths
 
 ## Alternatives
 
@@ -192,8 +238,15 @@ Some other gems with different approaches:
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/TenjinInc/dirt-envelope.
 
+Valued topics:
+
+* Error messages (clarity, hinting)
+* Documentation
+* API
+* Security correctness
+
 This project is intended to be a friendly space for collaboration, and contributors are expected to adhere to the
-[Contributor Covenant](http://contributor-covenant.org) code of conduct.
+[Contributor Covenant](http://contributor-covenant.org) code of conduct. Play nice.
 
 ### Core Developers
 
@@ -203,6 +256,9 @@ can also run `bin/console` for an interactive prompt that will allow you to expe
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the
 version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version,
 push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+
+Documentation is produced by Yard. Run `bundle exec rake yard`. The goal is to have 100% documentation coverage and 100%
+test coverage.
 
 ## License
 

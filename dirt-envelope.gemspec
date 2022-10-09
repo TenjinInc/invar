@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
    spec.summary     = 'Single source of truth for environmental configuration.'
    spec.description = <<~DESC
       Locates and loads config YAML files based on XDG standard with the encrypted secrets file kept separately.
-      Includes useful rake tasks to make management easier. No code execution in config. Rails-independent.
+      Includes useful rake tasks to make management easier. No code execution in config. Rails-independent. Gluten free.
    DESC
    spec.homepage = 'https://github.com/TenjinInc/dirt-envelope'
    spec.license  = 'MIT'
