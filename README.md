@@ -1,8 +1,8 @@
 # ENVelope
 
-## Big Picture
-
 Single source of truth for environmental configuration.
+
+## Big Picture
 
 A [12 Factor](http://12factor.net/config) application style is a good start, but there are downsides using environment
 variables for config:
