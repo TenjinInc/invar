@@ -27,6 +27,7 @@ Here's what this project aims to do:
 * Secrets encrypted using [Lockbox](https://github.com/ankane/lockbox)
 * Access ENV variables using symbols or case-insensitive strings.
 * Helpful Rake tasks
+* Meaningful error messages
 * Immutable
 
 ### Anti-Features
@@ -171,6 +172,15 @@ To edit the secrets file, run this and provide the file's encryption key:
 
 It will then open the decrypted file your default editor (eg. nano). Once you have saved the file, it will be
 re-encrypted.
+
+## Alternatives
+
+Some other gems with different approaches:
+
+- [RubyConfig](https://github.com/rubyconfig/config)
+- [Anyway Config](https://github.com/palkan/anyway_config)
+- [AppConfig](https://github.com/Oshuma/app_config)
+- [Fiagro](https://github.com/laserlemon/figaro)
 
 ## Contributing
 
