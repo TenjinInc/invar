@@ -1,7 +1,5 @@
 # ENVelope
 
-> **Note:** This gem is a prototype spike. The API is not yet stable.
-
 ## Big Picture
 
 Single source of truth for environmental configuration.
