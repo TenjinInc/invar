@@ -144,6 +144,12 @@ puts envelope / :config / :database / :host
 
 # Prints "my_app" 
 puts envelope / :secret / :database / :username
+
+# And you can get ENV variables. This should print your HOME directory.
+puts envelope / :config / :home
+
+# You can also use [] notation, if you really insist
+puts envelope[:config][:database][:host]
 ```
 
 ### Rake Tasks
