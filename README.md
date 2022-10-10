@@ -4,20 +4,28 @@ Single source of truth for environmental configuration.
 
 ## Big Picture
 
-A [12 Factor](http://12factor.net/config) application style is a good start, but there are downsides using environment
-variables for config:
+A [12 Factor](http://12factor.net/config) application style is a good start, but simple environment variables have
+downsides:
 
 * They are not groupable / nestable
 * Secrets might be leaked to untrustable subprocesses or 3rd party logging services (eg. an error dump including the
   whole ENV)
 * Cannot be easily checked against a schema for early error detection
-* Ruby's core ENV does not accept symbols as keys, which is a minor nuisance.
+* Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
+
+Here's what using Envelope looks like after you use the Rake tasks to manage your files:
+
+```ruby
+envelope = Dirt::Envelope.new
+
+db_host = envelope / :config / :database / :host
+```
 
 ### Features
 
-Here's what this project aims to do:
+Here's what this Gem provides:
 
-* [planned] File schema using dry-schema
+* *[planned] File schema using dry-schema*
 * Search path defaults based on
   the [XDG Base Directory](https://en.wikipedia.org/wiki/Freedesktop.org#Base_Directory_Specification)
   file location standard
@@ -42,8 +50,8 @@ Things that ENVelope intentionally does **not** support:
     * No proliferation of irrelevant files
 * Config file code interpretation (eg. ERB in YAML)
     * Security implications
-    * File structure complexity
-    * Value ambiguity
+    * No file structure complexity
+    * No value ambiguity
 
 ### But That's Bonkers
 
@@ -118,6 +126,29 @@ And then run in a terminal:
     bundle install
 
 ## Usage
+
+### Testing
+
+If you are not using `Bundler.require`, you will need to add this in your test suite setup file (eg.
+RSpec `spec_helper.rb` or Cucumber `support/env.rb`):
+
+```ruby
+require 'dirt/envelope/rake'
+```
+
+Envelope will load the config file created by the Rake tasks (details in next section), but that will be the normal
+runtime configuration. To nudge those values for testing you can register a block with `Dirt::Envelope.after_init` to
+modify values before they are frozen.
+
+```ruby
+# Put this in a Cucumber `BeforeAll` or RSpec `before(:all)` hook (or similar)
+Envelope.after_init do |envelope|
+   (envelope / :config / :database / :name).override 'my_app_test'
+end
+
+# ... later, in your actual application:
+envelope = Envelope.new(namespace: 'my-app')
+```
 
 ### Rake Tasks
 
