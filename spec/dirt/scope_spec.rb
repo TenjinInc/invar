@@ -56,7 +56,7 @@ module Dirt
             it 'should say the existing keys on key missing' do
                expect do
                   scope / :database / :another_key
-               end.to raise_error KeyError, 'key not found: :another_key. Known keys are :name, :host'
+               end.to raise_error KeyError, 'key not found: :another_key. Known keys are :host, :name'
             end
          end
 
