@@ -142,8 +142,8 @@ modify values before they are frozen.
 
 ```ruby
 # Put this in a Cucumber `BeforeAll` or RSpec `before(:all)` hook (or similar)
-Envelope.after_init do |envelope|
-   (envelope / :config / :database / :name).override 'my_app_test'
+Envelope.after_load do |envelope|
+   (envelope / :config / :database).override name: 'my_app_test'
 end
 
 # ... later, in your actual application:
