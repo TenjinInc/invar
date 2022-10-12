@@ -51,6 +51,13 @@ module Dirt
             it 'should alias #[]' do
                expect(scope[:party][:host]).to eq 'Bilbo Baggins'
             end
+
+            # easier to know if your key is totally wrong or if it's missing
+            it 'should say the existing keys on key missing' do
+               expect do
+                  scope / :database / :another_key
+               end.to raise_error KeyError, 'key not found: :another_key. Known keys are :name, :host'
+            end
          end
 
          describe '#override' do

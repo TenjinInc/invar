@@ -20,6 +20,8 @@ module Dirt
          def fetch(key)
             key = key.downcase.to_sym
             @data_override.fetch(key, @data.fetch(key))
+         rescue KeyError => e
+            raise KeyError, "#{ e.message }. Known keys are #{ @data.keys.collect { |k| ":#{ k }" }.join(', ') }"
          end
 
          alias / fetch
