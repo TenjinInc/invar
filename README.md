@@ -16,7 +16,7 @@ downsides:
 Here's what using Envelope looks like after you use the Rake tasks to manage your files:
 
 ```ruby
-envelope = Dirt::Envelope.new
+envelope = Dirt::Envelope.new(namespace: 'my-app')
 
 db_host = envelope / :config / :database / :host
 ```
@@ -118,7 +118,7 @@ Similarly, you should use a unique encryption key for each environment (eg. your
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'procrastinator'
+gem 'dirt-envelope'
 ```
 
 And then run in a terminal:
