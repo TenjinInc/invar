@@ -1,19 +1,10 @@
 # ENVelope
 
-Single source of truth for environmental configuration.
+Single source of truth for environment and configuration settings.
 
 ## Big Picture
 
-A [12 Factor](http://12factor.net/config) application style is a good start, but simple environment variables have
-downsides:
-
-* They are not groupable / nestable
-* Secrets might be leaked to untrustable subprocesses or 3rd party logging services (eg. an error dump including the
-  whole ENV)
-* Cannot be easily checked against a schema for early error detection
-* Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
-
-Here's what using Envelope looks like after you use the Rake tasks to manage your files:
+Using it in code looks like this:
 
 ```ruby
 envelope = Dirt::Envelope.new(namespace: 'my-app')
@@ -21,17 +12,32 @@ envelope = Dirt::Envelope.new(namespace: 'my-app')
 db_host = envelope / :config / :database / :host
 ```
 
+### Background
+
+Managing application config in a [12 Factor](http://12factor.net/config) style is a good idea, but simple environment
+variables have some downsides:
+
+* They are not groupable / nestable
+* Secrets might be leaked to untrustable subprocesses or 3rd party logging services (eg. an error dump including the
+  whole ENV)
+* Secrets might be stored in plaintext (eg. in cron or scripts). It's better to store secrets as encrypted.
+* Cannot be easily checked against a schema for early error detection
+* Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
+
+ENVelope's main purpose is to enhance and simplify how applications know about their system environment and config.
+
 ### Features
 
 Here's what this Gem provides:
 
-* *[planned] File schema using dry-schema*
-* Search path defaults based on
+* *[planned] File schema using [dry-schema](https://dry-rb.org/gems/dry-schema/main/)*
+* File location defaults from
   the [XDG Base Directory](https://en.wikipedia.org/wiki/Freedesktop.org#Base_Directory_Specification)
   file location standard
-* Distinction between configurations and secrets
+* Distinction between configs and secrets
 * Secrets encrypted using [Lockbox](https://github.com/ankane/lockbox)
-* Access ENV variables using symbols or case-insensitive strings.
+* Access configs and ENV variables using symbols or case-insensitive strings.
+* Enforced key uniqueness
 * Helpful Rake tasks
 * Meaningful error messages with suggestions
 * Immutable
@@ -40,55 +46,32 @@ Here's what this Gem provides:
 
 Things that ENVelope intentionally does **not** support:
 
-* Multiple config files
+* Multiple config sources
     * No subtle overrides
-    * No confusion about file changes being ignored because you're editing the wrong file
-    * No implicit priority-ordering knowledge
+    * No frustration about file edits not working... because you're editing the wrong file
+    * No remembering finicky precedence order
 * Modes
-    * A testing environment should control itself
     * No forgetting to set the mode before running rake, etc
-    * No proliferation of irrelevant files
+    * No proliferation of files irrelevant to the current situation
 * Config file code interpretation (eg. ERB in YAML)
-    * Security implications
-    * No file structure complexity
+    * Reduced security hazard
     * No value ambiguity
 
 ### But That's Bonkers
 
-It might be! Some situations may legitimately need extremely complex configuration setups. But sometimes a complex
-configuration environment is a code smell indicating that life could be better by:
+It might be! This is a bit of an experiment. Some things may appear undesirable at first glance, but it's usually for a
+reason.
 
-* Reducing your application into smaller parts (eg. microservices etc)
-* Reducing the number of service providers
-* Improving your deployment process
+Some situations might legitimately need a more complex configuration setup. But perhaps reflect on whether it's a code
+smell nudging you to:
+
+* Reduce your application into smaller parts (eg. microservices etc)
+* Reduce the number of service providers
+* Improve your collaboration or deployment procedures and automation
 
 You know your situation better than this README can.
 
-## Concepts
-
-### XDG Base Directory
-
-This is a standard that defines where applications should store their files (config, data, etc). The relevant summary
-for config files is:
-
-1. Look in `XDG_CONFIG_HOME`
-    - Will be ignored when `$HOME` directory is undefined, usually system daemons.
-    - Default: `~/.config/`
-2. Then look in `XDG_CONFIG_DIRS`
-    - A colon-separated list in priority order left to right.
-    - Default: `/etc/xdg/`
-
-You can check your values by running `env | grep XDG` in a terminal.
-
-### Namespace
-
-This is the name of the subdirectory under the XDG Base Directory. By default you should expect:
-
-`~/.config/name-of-app`
-
-or
-
-`/etc/xdg/name-of-app`
+## Concepts and Jargon
 
 ### Configurations
 
@@ -113,6 +96,34 @@ file.
 
 Similarly, you should use a unique encryption key for each environment (eg. your development laptop vs a server).
 
+### XDG Base Directory
+
+This is a standard that defines where applications should store their files (config, data, etc). The relevant part is
+that it looks in a couple of places for config files, declared in a pair of environment variables:
+
+1. `XDG_CONFIG_HOME`
+    - Note: Ignored when `$HOME` directory is undefined. Often the case for system daemons.
+    - Default: `~/.config/`
+2. `XDG_CONFIG_DIRS`
+    - Fallback locations, declared as a colon-separated list in priority order.
+    - Default: `/etc/xdg/`
+
+You can check your current values by running this in a terminal:
+
+    env | grep XDG
+
+### Namespace
+
+The name of the app's subdirectory under the relevant XDG Base Directory.
+
+eg:
+
+`~/.config/name-of-app`
+
+or
+
+`/etc/xdg/name-of-app`
+
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -130,24 +141,24 @@ And then run in a terminal:
 ### Testing
 
 If you are not using `Bundler.require`, you will need to add this in your test suite setup file (eg.
-RSpec `spec_helper.rb` or Cucumber `support/env.rb`):
+RSpec's `spec_helper.rb` or Cucumber's `support/env.rb`):
 
 ```ruby
 require 'dirt/envelope/rake'
 ```
 
-Envelope will load the config file created by the Rake tasks (details in next section), but that will be the normal
-runtime configuration. To nudge those values for testing you can register a block with `Dirt::Envelope.after_init` to
-modify values before they are frozen.
+Envelope will load the config file created by the Rake tasks (details in next section), which provides the normal
+runtime configuration. To nudge those values for testing you can register a block with `Dirt::Envelope.after_load` to
+modify values before the config is made immutable.
 
 ```ruby
 # Put this in a Cucumber `BeforeAll` or RSpec `before(:all)` hook (or similar)
-Envelope.after_load do |envelope|
+Dirt::Envelope.after_load do |envelope|
    (envelope / :config / :database).override name: 'my_app_test'
 end
 
 # ... later, in your actual application:
-envelope = Envelope.new(namespace: 'my-app')
+envelope = Dirt::Envelope.new(namespace: 'my-app')
 ```
 
 ### Rake Tasks
