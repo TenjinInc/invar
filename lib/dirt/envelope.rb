@@ -44,7 +44,7 @@ module Dirt
          # key to discourage hardcoding your encryption key and committing it to version control.
          #
          # @param [String] namespace name of the subdirectory within XDG locations
-         # @param [#to_path] decryption_keyfile Any #to_path capable object referring to the decryption key file
+         # @param [#read] decryption_keyfile Any #read capable object referring to the decryption key file
          def initialize(namespace:, decryption_keyfile: nil)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
@@ -138,9 +138,7 @@ module Dirt
          def resolve_key(pathname, locator, prompt)
             key_file = locator.find(pathname)
 
-            # if key_file.respond_to? :to_path
             read_keyfile(key_file)
-            # end
          rescue FileLocator::FileNotFoundError
             if $stdin.respond_to?(:noecho)
                warn prompt
@@ -165,7 +163,7 @@ module Dirt
                             hint: hint)
             end
 
-            key_file.read
+            key_file.read.strip
          end
       end
 

@@ -242,6 +242,15 @@ module Dirt
                      end.to_not output.to_stderr
                   end
 
+                  # terminal text editors can add a newline at the end a file as default behaviour
+                  it 'should strip whitespace around the key in a file' do
+                     key_path.write "\n\n \t#{ default_lockbox_key }\t \n"
+
+                     expect do
+                        described_class.new namespace: name, decryption_keyfile: key_file
+                     end.to_not output.to_stderr
+                  end
+
                   it 'should NOT complain when keyfile has proper permissions' do
                      [0o400, 0o600].each do |mode|
                         key_path.chmod(mode)
