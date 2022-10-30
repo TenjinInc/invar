@@ -3,6 +3,6 @@
 module Dirt
    module Envelope
       # Current version of the gem
-      VERSION = '0.1.0'
+      VERSION = '0.2.0'
    end
 end

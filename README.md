@@ -140,24 +140,35 @@ And then run in a terminal:
 
 ### Testing
 
-If you are not using `Bundler.require`, you will need to add this in your test suite setup file (eg.
-RSpec's `spec_helper.rb` or Cucumber's `support/env.rb`):
+Envelope automatically loads the normal runtime configuration from the config files created by the Rake tasks (details
+in next section), but tests may need to override some of those values.
+
+Call `#pretend` on the relevant selector:
 
 ```ruby
-require 'dirt/envelope/rake'
+# Your application require Envelope as normal:
+require 'dirt/envelope'
+
+envelope = Dirt::Envelope.new(namespace: 'my-app')
+
+# ... then, in your test suite:
+require 'dirt/envelope/test'
+
+# Usually this would be in a test suite hook, 
+# like Cucumber's `BeforeAll` or RSpec's `before(:all)`
+envelope[:config][:theme].pretend dark_mode: true
 ```
 
-Envelope will load the config file created by the Rake tasks (details in next section), which provides the normal
-runtime configuration. To nudge those values for testing you can register a block with `Dirt::Envelope.after_load` to
-modify values before the config is made immutable.
+Calling `#pretend` without requiring `dirt/envelope/test` will raise an `ImmutableRealityError`.
+
+To override values immediately after the config files are read, use an `Envelope.after_load` block:
 
 ```ruby
-# Put this in a Cucumber `BeforeAll` or RSpec `before(:all)` hook (or similar)
-Dirt::Envelope.after_load do |envelope|
-   (envelope / :config / :database).override name: 'my_app_test'
+Envelope.after_load do |envelope|
+   envelope[:config][:database].pretend name: 'my_app_test'
 end
 
-# ... later, in your actual application:
+# This envelope will return database name 'my_app_test'
 envelope = Dirt::Envelope.new(namespace: 'my-app')
 ```
 
@@ -249,7 +260,7 @@ puts envelope / :secret / :database / :username
 # And you can get ENV variables. This should print your HOME directory.
 puts envelope / :config / :home
 
-# You can also use [] notation, if you really insist
+# You can also use [] notation, which may be nicer in some situations (like #pretend)
 puts envelope[:config][:database][:host]
 ```
 

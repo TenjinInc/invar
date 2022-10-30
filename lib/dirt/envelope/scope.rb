@@ -27,13 +27,8 @@ module Dirt
          alias / fetch
          alias [] fetch
 
-         # Overrides the given set of key-value pairs. This is intended to only be used in testing environments,
-         # where you may need contextual adjustments to suit the test situation.
-         #
-         # @param [Hash] pairs the hash of pairs to override.
-         def override(pairs)
-            @data_override.merge!(pairs)
-            @data_override.freeze
+         def pretend(**)
+            raise Dirt::Envelope::ImmutableRealityError, ImmutableRealityError::MSG
          end
 
          private

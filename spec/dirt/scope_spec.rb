@@ -60,7 +60,7 @@ module Dirt
             end
          end
 
-         describe '#override' do
+         describe '#prevent' do
             let(:data) do
                {
                      event: 'Birthday',
@@ -69,12 +69,22 @@ module Dirt
             end
             let(:scope) { described_class.new data }
 
+            it 'should explode when called outside of a pretend' do
+               expect do
+                  scope.pretend event: 'Disappearance'
+               end.to raise_error Dirt::Envelope::ImmutableRealityError, ImmutableRealityError::MSG
+            end
+
             it 'should override a data field' do
-               scope.override(event: 'Disappearance')
+               require 'dirt/envelope/test'
+               scope.pretend(event: 'Disappearance')
+
+               expect(scope / :event).to eq 'Disappearance'
             end
 
             it 'should override multiple data fields' do
-               scope.override(event: 'Fireworks', host: 'Gandalf')
+               require 'dirt/envelope/test'
+               scope.pretend(event: 'Fireworks', host: 'Gandalf')
 
                expect(scope / :event).to eq 'Fireworks'
                expect(scope / :host).to eq 'Gandalf'

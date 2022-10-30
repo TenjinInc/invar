@@ -64,7 +64,6 @@ module Dirt
             end
 
             freeze
-
             # instance_eval(&self.class.__override_block__)
             self.class.__override_block__&.call(self)
          end
@@ -205,6 +204,20 @@ module Dirt
       class AmbiguousSourceError < RuntimeError
          # Message hinting at possible solution
          HINT = 'Choose 1 correct one and delete the others.'
+      end
+
+      # Raised when #pretend is called but the testing extension has not been loaded.
+      #
+      # When raised during normal operation, it may mean the application is calling #pretend directly, which is strongly
+      # discouraged. The feature is meant for testing.
+      #
+      # @see Envelope#pretend
+      class ImmutableRealityError < NoMethodError
+         # Message and hint for a possible solution
+         MSG = <<~MSG
+            Method 'pretend' is defined in the testing extension. Try adding this to your test suite config file:
+               require 'dirt/envelope/test'
+         MSG
       end
    end
 end

@@ -29,57 +29,32 @@ module Dirt
          end
       end
 
-      describe '.override' do
-         let(:config_content) do
-            <<~YML
-               ---
-               database:
-                  name: dev_database
-                  hostname: localhost
-            YML
-         end
-
+      describe '.after_load' do
          before(:each) do
-            configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
-            configs_dir.mkpath
-            configs_file = configs_dir / 'config.yml'
-            secrets_file = configs_dir / 'secrets.yml'
-            key_file     = configs_dir / 'master_key'
+            configs_dir = Pathname.new('~/.config/test-app').expand_path
+            config_path = configs_dir / 'config.yml'
+            config_path.dirname.mkpath
+            config_path.write '---'
 
-            configs_file.write config_content
-            secrets_file.write lockbox.encrypt <<~YML
-               ---
-            YML
+            secrets_path = configs_dir / 'secrets.yml'
+            secrets_path.dirname.mkpath
+            secrets_path.write lockbox.encrypt '---'
+
+            key_file = configs_dir / 'master_key'
             key_file.write default_lockbox_key
             key_file.chmod 0o600
          end
 
-         after(:each) do
+         it 'should run the handler after loading an instance' do
+            has_run = false
+
             Envelope.after_load do
-               # nothing
+               has_run = true
             end
-         end
 
-         it 'should allow an override' do
-            new_db_name = 'test_database'
-
-            Envelope.after_load do |envelope|
-               (envelope / :config / :database).override name: new_db_name
-            end
-            envelope = Envelope::Envelope.new(namespace: 'test-app')
-
-            expect(envelope / :configs / :database / :name).to eq new_db_name
-         end
-
-         it 'should only override the relevant info' do
-            new_db_name = 'test_database'
-
-            Envelope.after_load do |envelope|
-               (envelope / :config / :database).override name: new_db_name
-            end
-            envelope = Envelope::Envelope.new(namespace: 'test-app')
-
-            expect(envelope / :configs / :database / :hostname).to eq 'localhost'
+            expect(has_run).to be false
+            described_class.new namespace: 'test-app'
+            expect(has_run).to be true
          end
       end
    end
