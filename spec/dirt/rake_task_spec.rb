@@ -45,21 +45,19 @@ describe 'Rake Tasks' do
 
       context '$HOME is defined' do
          let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:config_path) { configs_dir / 'config.yml' }
 
          it 'should create a config file in the XDG_CONFIG_HOME path' do
             task.invoke(name)
 
-            expect(configs_dir / 'config.yml').to exist
+            expect(config_path).to exist
          end
 
          it 'should state the file it created' do
-            config_path = configs_dir / 'config.yml'
-
             expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
          end
 
          it 'should abort if the file already exists' do
-            config_path = configs_dir / 'config.yml'
             configs_dir.mkpath
             config_path.write ''
 
@@ -76,6 +74,7 @@ describe 'Rake Tasks' do
             xdg_default = Dirt::Envelope::XDG::Defaults::CONFIG_DIRS
             Pathname.new(ENV.fetch('XDG_CONFIG_DIRS', xdg_default).split(':').first).expand_path / name
          end
+         let(:config_path) { configs_dir / 'config.yml' }
 
          around(:each) do |example|
             old_home = Dir.home
@@ -87,12 +86,10 @@ describe 'Rake Tasks' do
          it 'should create a config file in the first XDG_CONFIG_DIRS path' do
             task.invoke(name)
 
-            expect(configs_dir / 'config.yml').to exist
+            expect(config_path).to exist
          end
 
          it 'should state the file it created' do
-            config_path = configs_dir / 'config.yml'
-
             expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
          end
       end

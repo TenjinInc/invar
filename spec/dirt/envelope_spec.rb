@@ -7,6 +7,12 @@ module Dirt
       let(:default_lockbox_key) { '0' * 64 }
       let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
 
+      let(:name) { 'my-app' }
+      let(:configs_dir) { Pathname.new('~/.config').expand_path / name }
+      let(:config_path) { configs_dir / 'config.yml' }
+      let(:secrets_path) { configs_dir / 'secrets.yml' }
+      let(:key_path) { configs_dir / 'master_key' }
+
       before :each do
          gem_dir = Pathname.new(ENV.fetch('GEM_HOME')) / 'gems'
 
@@ -21,44 +27,27 @@ module Dirt
          end
       end
 
+      before(:each) do
+         configs_dir.mkpath
+
+         config_path.write '---'
+         secrets_path.write lockbox.encrypt('---')
+
+         key_path.write default_lockbox_key
+         key_path.chmod 0o600
+      end
+
       it 'should have a version number' do
          expect(Dirt::Envelope::VERSION).not_to be nil
       end
 
       describe '.new' do
          it 'should alias Envelope::Envelope.new' do
-            configs_dir = Pathname.new('~/.config').expand_path / 'test-app'
-            configs_dir.mkpath
-            configs_file = configs_dir / 'config.yml'
-            secrets_file = configs_dir / 'secrets.yml'
-            key_file     = configs_dir / 'master_key'
-
-            configs_file.write '---'
-            secrets_file.write lockbox.encrypt('---')
-
-            key_file.write default_lockbox_key
-            key_file.chmod 0o600
-
-            expect(Envelope.new(namespace: 'test-app')).to be_a Envelope::Envelope
+            expect(Envelope.new(namespace: name)).to be_a Envelope::Envelope
          end
       end
 
       describe '.after_load' do
-         before(:each) do
-            configs_dir = Pathname.new('~/.config/test-app').expand_path
-            config_path = configs_dir / 'config.yml'
-            config_path.dirname.mkpath
-            config_path.write '---'
-
-            secrets_path = configs_dir / 'secrets.yml'
-            secrets_path.dirname.mkpath
-            secrets_path.write lockbox.encrypt '---'
-
-            key_file = configs_dir / 'master_key'
-            key_file.write default_lockbox_key
-            key_file.chmod 0o600
-         end
-
          it 'should run the handler after loading an instance' do
             has_run = false
 
@@ -67,7 +56,7 @@ module Dirt
             end
 
             expect(has_run).to be false
-            described_class.new namespace: 'test-app'
+            described_class.new namespace: name
             expect(has_run).to be true
          end
       end
