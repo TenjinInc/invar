@@ -31,6 +31,10 @@ module Dirt
             raise Dirt::Envelope::ImmutableRealityError, ImmutableRealityError::MSG
          end
 
+         def to_h
+            @data.merge(@data_override).to_h
+         end
+
          private
 
          def convert(data)

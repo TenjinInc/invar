@@ -7,6 +7,7 @@ require 'dirt/envelope/scope'
 require 'yaml'
 require 'lockbox'
 require 'pathname'
+require 'dry/schema'
 
 module Dirt
    # ENVelope
@@ -45,7 +46,7 @@ module Dirt
          #
          # @param [String] namespace name of the subdirectory within XDG locations
          # @param [#read] decryption_keyfile Any #read capable object referring to the decryption key file
-         def initialize(namespace:, decryption_keyfile: nil)
+         def initialize(namespace:, decryption_keyfile: nil, configs_schema: nil, secrets_schema: nil)
             locator      = FileLocator.new(namespace)
             search_paths = locator.search_paths.join(', ')
 
@@ -57,7 +58,7 @@ module Dirt
             end
 
             begin
-               @secrets = Scope.new(load_secrets(locator, decryption_keyfile || DEFAULT_KEY_FILE_NAME))
+               @secrets = Scope.new(load_secrets(locator, decryption_keyfile))
             rescue FileLocator::FileNotFoundError
                raise MissingSecretsFileError,
                      "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
@@ -66,6 +67,8 @@ module Dirt
             freeze
             # instance_eval(&self.class.__override_block__)
             self.class.__override_block__&.call(self)
+
+            validate_with configs_schema, secrets_schema
          end
 
          class << self
@@ -93,28 +96,32 @@ module Dirt
          private
 
          def load_configs(locator)
-            env = ENV.to_hash.transform_keys(&:downcase).transform_keys(&:to_sym)
-
             file = locator.find('config', EXT::YAML)
 
             configs = parse(file.read)
 
-            collision_key = configs.keys.collect(&:downcase).find { |key| env.key? key }
+            collision_key = configs.keys.collect(&:downcase).find { |key| env_hash.key? key }
             if collision_key
                hint = EnvConfigCollisionError::HINT
                raise EnvConfigCollisionError,
                      "Both the environment and your config file have key #{ collision_key }. #{ hint }"
             end
 
-            configs.merge(env)
+            configs.merge(env_hash)
+         end
+
+         def env_hash
+            ENV.to_hash.transform_keys(&:downcase).transform_keys(&:to_sym)
          end
 
          def load_secrets(locator, decryption_keyfile)
             file = locator.find('secrets', EXT::YAML)
 
             lockbox = begin
-                         Lockbox.new(key: Lockbox.master_key || resolve_key(decryption_keyfile, locator,
-                                                                            "Enter master key to decrypt #{ file }:"))
+                         decryption_key = Lockbox.master_key || resolve_key(decryption_keyfile, locator,
+                                                                            "Enter master key to decrypt #{ file }:")
+
+                         Lockbox.new(key: decryption_key)
                       rescue Lockbox::Error => e
                          raise SecretsFileDecryptionError, e
                       end
@@ -135,7 +142,7 @@ module Dirt
          end
 
          def resolve_key(pathname, locator, prompt)
-            key_file = locator.find(pathname)
+            key_file = locator.find(pathname || DEFAULT_KEY_FILE_NAME)
 
             read_keyfile(key_file)
          rescue FileLocator::FileNotFoundError
@@ -163,6 +170,47 @@ module Dirt
             end
 
             key_file.read.strip
+         end
+
+         def validate_with(configs_schema, secrets_schema)
+            env_keys = env_hash.keys
+
+            configs_schema ||= Dry::Schema.define
+
+            # Special schema for just the env variables, listing them explicitly allows for using validate_keys
+            env_schema = Dry::Schema.define do
+               env_keys.each do |key|
+                  optional(key)
+               end
+            end
+
+            schema = Dry::Schema.define do
+               config.validate_keys = true
+
+               required(:configs).hash(configs_schema & env_schema)
+
+               if secrets_schema
+                  required(:secrets).hash(secrets_schema)
+               else
+                  required(:secrets)
+               end
+            end
+
+            validation = schema.call(configs: @configs.to_h,
+                                     secrets: @secrets.to_h)
+
+            return true if validation.success?
+
+            errs = validation.errors.messages.collect do |message|
+               [message.path.collect do |p|
+                  ":#{ p }"
+               end.join(' / '), message.text].join(' ')
+            end
+
+            raise SchemaValidationError, <<~ERR
+               Validation errors:
+                  #{ errs.join("\n   ") }
+            ERR
          end
       end
 
@@ -218,6 +266,10 @@ module Dirt
             Method 'pretend' is defined in the testing extension. Try adding this to your test suite config file:
                require 'dirt/envelope/test'
          MSG
+      end
+
+      # Raised when schema validation fails
+      class SchemaValidationError < RuntimeError
       end
    end
 end

@@ -60,7 +60,7 @@ module Dirt
             end
          end
 
-         describe '#prevent' do
+         describe '#pretend' do
             let(:data) do
                {
                      event: 'Birthday',
@@ -88,6 +88,28 @@ module Dirt
 
                expect(scope / :event).to eq 'Fireworks'
                expect(scope / :host).to eq 'Gandalf'
+            end
+         end
+
+         describe '#to_h' do
+            let(:data) do
+               {
+                     event: 'Birthday',
+                     host:  'Bilbo Baggins'
+               }
+            end
+            let(:scope) { described_class.new data }
+
+            it 'should include its keys and values' do
+               expect(scope.to_h).to eq(data)
+            end
+
+            it 'should include pretend values' do
+               require 'dirt/envelope/test'
+               scope.pretend(event: 'Disappearance')
+
+               expect(scope.to_h).to eq(event: 'Disappearance',
+                                        host:  'Bilbo Baggins')
             end
          end
       end

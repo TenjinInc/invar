@@ -7,6 +7,20 @@ module Dirt
       let(:default_lockbox_key) { '0' * 64 }
       let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
 
+      before :each do
+         gem_dir = Pathname.new(ENV.fetch('GEM_HOME')) / 'gems'
+
+         dry_gems = Bundler.locked_gems.specs.collect(&:full_name).select do |name|
+            name.start_with? 'dry-schema', 'dry-logic'
+         end
+
+         # need to clone dry gems because they seem to lazy load after FakeFS is engaged
+         # TODO: this will disappear if FakeFS is removed
+         dry_gems.each do |path|
+            FakeFS::FileSystem.clone(gem_dir / path)
+         end
+      end
+
       it 'should have a version number' do
          expect(Dirt::Envelope::VERSION).not_to be nil
       end
@@ -61,6 +75,7 @@ module Dirt
 
    module Envelope
       describe Envelope do
+         let(:name) { 'my-app' }
          let(:default_lockbox_key) { '0' * 64 }
          let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
          let(:clear_yaml) do
@@ -69,7 +84,25 @@ module Dirt
             YML
          end
 
+         before :each do
+            gem_dir = Pathname.new(ENV.fetch('GEM_HOME')) / 'gems'
+
+            dry_gems = Bundler.locked_gems.specs.collect(&:full_name).select do |name|
+               name.start_with? 'dry-schema', 'dry-logic'
+            end
+
+            # need to clone dry gems because they seem to lazy load after FakeFS is engaged
+            # TODO: this will disappear if FakeFS is removed
+            dry_gems.each do |path|
+               FakeFS::FileSystem.clone(gem_dir / path)
+            end
+         end
+
          describe '#initialize' do
+            let(:configs_dir) { Pathname.new('~/.config').expand_path / name }
+            let(:config_path) { configs_dir / 'config.yml' }
+            let(:secrets_path) { configs_dir / 'secrets.yml' }
+
             it 'should explode when namespace missing' do
                expect { described_class.new }.to raise_error ArgumentError, 'missing keyword: :namespace'
             end
@@ -78,28 +111,108 @@ module Dirt
             # and just general state & behaviour predictability.
             # It does not, however, guarantee the actual stored values are also frozen.
             it 'should freeze the ENVelope after creation' do
-               configs_dir = Pathname.new('~/.config/test-app').expand_path
-               config_path = configs_dir / 'config.yml'
-               config_path.dirname.mkpath
-               config_path.write clear_yaml
+               configs_dir.mkpath
 
-               secrets_path = configs_dir / 'secrets.yml'
-               secrets_path.dirname.mkpath
+               config_path.write clear_yaml
                secrets_path.write lockbox.encrypt clear_yaml
 
                key_file = configs_dir / 'master_key'
                key_file.write default_lockbox_key
                key_file.chmod 0o600
 
-               envelope = described_class.new namespace: 'test-app'
+               envelope = described_class.new namespace: name do
+                  required(:configs)
+                  required(:secrets)
+               end
 
                expect(envelope).to be_frozen
             end
 
+            context 'schema' do
+               before(:each) do
+                  configs_dir.mkpath
+
+                  config_path.write clear_yaml
+                  secrets_path.write lockbox.encrypt clear_yaml
+
+                  key_file = configs_dir / 'master_key'
+                  key_file.write default_lockbox_key
+                  key_file.chmod 0o600
+               end
+
+               it 'should explode when there are unexpected keys in config' do
+                  config_path.write <<~YML
+                     ---
+                     something: 'else'
+                     database:
+                        name: 'test_db'
+                  YML
+
+                  configs_schema = Dry::Schema.define do
+                     required(:database).hash do
+                        required(:name).filled
+                     end
+                  end
+
+                  secrets_schema = Dry::Schema.define do
+                     required(:password).filled
+                  end
+
+                  expect do
+                     described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
+                  end.to raise_error SchemaValidationError, include('Validation errors')
+                                                                  .and(include(':something is not allowed'))
+               end
+
+               it 'should explode when there are unexpected keys in secrets' do
+                  secrets_path.write lockbox.encrypt <<~YML
+                     ---
+                     something: 'else'
+                     database:
+                        password: 'sekret'
+                  YML
+
+                  configs_schema = Dry::Schema.define do
+                     required(:database).hash do
+                        required(:name).filled
+                     end
+                  end
+
+                  secrets_schema = Dry::Schema.define do
+                     required(:database).hash do
+                        required(:password).filled
+                     end
+                  end
+
+                  expect do
+                     described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
+                  end.to raise_error SchemaValidationError, include('Validation errors')
+                                                                  .and(include(':something is not allowed'))
+               end
+
+               it 'should validate the loaded settings' do
+                  expect do
+                     configs_schema = Dry::Schema.define do
+                        required(:database).hash do
+                           required(:name).filled
+                        end
+                     end
+
+                     secrets_schema = Dry::Schema.define do
+                        required(:database).hash do
+                           required(:password).filled
+                        end
+                     end
+
+                     described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
+                  end.to raise_error SchemaValidationError, include('Validation errors')
+                                                                  .and(include(':configs / :database is missing'))
+                                                                  .and(include(':secrets / :database is missing'))
+               end
+            end
+
             context 'config file' do
                context 'config file missing' do
-                  let(:name) { 'my-app' }
-
                   it 'should explode' do
                      expect do
                         described_class.new namespace: name
@@ -188,7 +301,10 @@ module Dirt
 
                   it 'should NOT ask for it from STDIN' do
                      expect do
-                        described_class.new namespace: name
+                        described_class.new namespace: name do
+                           required(:configs)
+                           required(:secrets)
+                        end
                      end.to_not output.to_stderr
                   end
 
@@ -197,7 +313,10 @@ module Dirt
                      Lockbox.master_key = default_lockbox_key
 
                      expect do
-                        described_class.new namespace: name
+                        described_class.new namespace: name do
+                           required(:configs)
+                           required(:secrets)
+                        end
                      end.to_not output.to_stderr
 
                      Lockbox.master_key = old_key
@@ -213,7 +332,10 @@ module Dirt
 
                   it 'should read from a Pathname key file' do
                      expect do
-                        described_class.new namespace: name, decryption_keyfile: key_file
+                        described_class.new namespace: name, decryption_keyfile: key_file do
+                           required(:configs)
+                           required(:secrets)
+                        end
                      end.to_not output.to_stderr
                   end
 
@@ -222,7 +344,10 @@ module Dirt
                      key_path.write "\n\n \t#{ default_lockbox_key }\t \n"
 
                      expect do
-                        described_class.new namespace: name, decryption_keyfile: key_file
+                        described_class.new namespace: name, decryption_keyfile: key_file do
+                           required(:configs)
+                           required(:secrets)
+                        end
                      end.to_not output.to_stderr
                   end
 
@@ -231,7 +356,10 @@ module Dirt
                         key_path.chmod(mode)
 
                         expect do
-                           described_class.new namespace: name, decryption_keyfile: key_file
+                           described_class.new namespace: name, decryption_keyfile: key_file do
+                              required(:configs)
+                              required(:secrets)
+                           end
                         end.to_not raise_error
                      end
                   end
@@ -285,7 +413,10 @@ module Dirt
 
                      expect do
                         $stdin = double('fake IO', noecho: default_lockbox_key)
-                        described_class.new namespace: name
+                        described_class.new namespace: name do
+                           required(:configs)
+                           required(:secrets)
+                        end
                         $stdin = STDIN
                      end.to output(start_with(msg)).to_stderr
                   end
@@ -295,7 +426,10 @@ module Dirt
 
                      expect do
                         $stdin = double('fake IO', noecho: default_lockbox_key)
-                        described_class.new namespace: name
+                        described_class.new namespace: name do
+                           required(:configs)
+                           required(:secrets)
+                        end
                         $stdin = STDIN
                      end.to output(include(path.expand_path.to_s)).to_stderr
                   end
@@ -308,7 +442,10 @@ module Dirt
                      expect(input).to receive(:noecho).and_return default_lockbox_key
 
                      $stderr = StringIO.new
-                     described_class.new namespace: name
+                     described_class.new namespace: name do
+                        required(:configs)
+                        required(:secrets)
+                     end
                      $stderr = STDERR
 
                      $stdin = STDIN
@@ -375,7 +512,21 @@ module Dirt
          # information and how carefully to treat it. It also causes an explicit reminder that secrets are secret.
          describe '#/' do
             let(:name) { 'test-app' }
-            let(:envelope) { described_class.new namespace: name }
+            let(:configs_schema) do
+               Dry::Schema.define do
+                  required(:location)
+               end
+            end
+            let(:secrets_schema) do
+               Dry::Schema.define do
+                  required(:pass)
+               end
+            end
+            let(:envelope) do
+               described_class.new namespace:      name,
+                                   configs_schema: configs_schema,
+                                   secrets_schema: secrets_schema
+            end
             let(:configs_dir) { Pathname.new('~/.config/test-app').expand_path }
             let(:key_path) { configs_dir / 'master_key' }
             let(:configs_path) { configs_dir / 'config.yml' }
