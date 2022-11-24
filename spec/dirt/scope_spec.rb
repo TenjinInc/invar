@@ -111,6 +111,13 @@ module Dirt
                expect(scope / :event).to eq 'Fireworks'
                expect(scope / :host).to eq 'Gandalf'
             end
+
+            it 'should convert the key to a symbol' do
+               require 'dirt/envelope/test'
+               scope.pretend('event' => 'Fireworks')
+
+               expect(scope / :event).to eq 'Fireworks'
+            end
          end
 
          describe '#to_h' do
@@ -126,7 +133,7 @@ module Dirt
                expect(scope.to_h).to eq(data)
             end
 
-            it 'should include pretend values' do
+            it 'should use pretend values instead of regular ones' do
                require 'dirt/envelope/test'
                scope.pretend(event: 'Disappearance')
 

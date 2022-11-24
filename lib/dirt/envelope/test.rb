@@ -12,7 +12,7 @@ module Dirt
          #
          # @param [Hash] pairs the hash of pairs to override.
          def pretend(pairs)
-            @data_override.merge!(pairs)
+            @data_override.merge!(pairs.transform_keys(&:to_sym))
          end
       end
    end
