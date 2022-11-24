@@ -9,6 +9,7 @@
 ### Minor Changes
 
 * Added support for validation using dry-schema
+* Added #key? to Scope
 
 ### Bugfixes
 

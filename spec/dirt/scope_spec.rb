@@ -60,6 +60,28 @@ module Dirt
             end
          end
 
+         describe '#key?' do
+            let(:data) do
+               {
+                     domain: 'bag-end.example.com',
+                     party:  {
+                           name: 'Birthday',
+                           host: 'Bilbo Baggins'
+                     }
+               }
+            end
+            let(:scope) { described_class.new data }
+
+            it 'should return true when that key is defined' do
+               expect(scope.key?(:domain)).to be true
+               expect(scope.key?(:party)).to be true
+            end
+
+            it 'should return false when that key is NOT defined' do
+               expect(scope.key?(:mordor)).to be false
+            end
+         end
+
          describe '#pretend' do
             let(:data) do
                {

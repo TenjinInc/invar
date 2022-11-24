@@ -35,6 +35,10 @@ module Dirt
             @data.merge(@data_override).to_h
          end
 
+         def key?(key_name)
+            to_h.key?(key_name)
+         end
+
          private
 
          def convert(data)
