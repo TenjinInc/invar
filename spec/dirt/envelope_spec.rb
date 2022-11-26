@@ -118,6 +118,22 @@ module Dirt
             end
 
             context 'schema' do
+               let(:configs_schema) do
+                  Dry::Schema.define do
+                     required(:database).schema do
+                        required(:name).filled
+                     end
+                  end
+               end
+
+               let(:secrets_schema) do
+                  Dry::Schema.define do
+                     required(:database).hash do
+                        required(:password).filled
+                     end
+                  end
+               end
+
                before(:each) do
                   configs_dir.mkpath
 
@@ -130,69 +146,41 @@ module Dirt
                end
 
                it 'should explode when there are unexpected keys in config' do
+                  # testing both nested and root keys
                   config_path.write <<~YML
                      ---
-                     something: 'else'
+                     elevenses: false
                      database:
                         name: 'test_db'
+                        balrogs: 1
                   YML
 
-                  configs_schema = Dry::Schema.define do
-                     required(:database).hash do
-                        required(:name).filled
-                     end
-                  end
-
-                  secrets_schema = Dry::Schema.define do
-                     required(:password).filled
-                  end
-
                   expect do
-                     described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
+                     described_class.new namespace: name, configs_schema: configs_schema
                   end.to raise_error SchemaValidationError, include('Validation errors')
-                                                                  .and(include(':something is not allowed'))
+                                                                  .and(include(':balrogs is not allowed'))
+                                                                  .and(include(':elevenses is not allowed'))
                end
 
                it 'should explode when there are unexpected keys in secrets' do
+                  # testing both nested and root keys
                   secrets_path.write lockbox.encrypt <<~YML
                      ---
-                     something: 'else'
+                     took: 'fool'
                      database:
                         password: 'sekret'
+                        friend: 'mellon'
                   YML
-
-                  configs_schema = Dry::Schema.define do
-                     required(:database).hash do
-                        required(:name).filled
-                     end
-                  end
-
-                  secrets_schema = Dry::Schema.define do
-                     required(:database).hash do
-                        required(:password).filled
-                     end
-                  end
 
                   expect do
                      described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
                   end.to raise_error SchemaValidationError, include('Validation errors')
-                                                                  .and(include(':something is not allowed'))
+                                                                  .and(include(':took is not allowed'))
+                                                                  .and(include(':friend is not allowed'))
                end
 
-               it 'should validate the loaded settings' do
+               it 'should validate the loaded configs and secrets' do
                   expect do
-                     configs_schema = Dry::Schema.define do
-                        required(:database).hash do
-                           required(:name).filled
-                        end
-                     end
-
-                     secrets_schema = Dry::Schema.define do
-                        required(:database).hash do
-                           required(:password).filled
-                        end
-                     end
-
                      described_class.new namespace: name, configs_schema: configs_schema, secrets_schema: secrets_schema
                   end.to raise_error SchemaValidationError, include('Validation errors')
                                                                   .and(include(':configs / :database is missing'))

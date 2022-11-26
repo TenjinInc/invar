@@ -123,8 +123,12 @@ module Dirt
          describe '#to_h' do
             let(:data) do
                {
-                     event: 'Birthday',
-                     host:  'Bilbo Baggins'
+                     event:         'Birthday',
+                     host:          'Bilbo Baggins',
+                     entertainment: {
+                           provider: 'Gandalf',
+                           show:     'Fireworks'
+                     }
                }
             end
             let(:scope) { described_class.new data }
@@ -137,8 +141,17 @@ module Dirt
                require 'dirt/envelope/test'
                scope.pretend(event: 'Disappearance')
 
-               expect(scope.to_h).to eq(event: 'Disappearance',
-                                        host:  'Bilbo Baggins')
+               expect(scope.to_h).to include(event: 'Disappearance')
+            end
+
+            it 'should convert subscopes to hash' do
+               require 'dirt/envelope/test'
+               scope.pretend(event: 'Disappearance')
+
+               expect(scope.to_h).to include(entertainment: {
+                     provider: 'Gandalf',
+                     show:     'Fireworks'
+               })
             end
          end
       end

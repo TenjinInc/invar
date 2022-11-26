@@ -32,7 +32,14 @@ module Dirt
          end
 
          def to_h
-            @data.merge(@data_override).to_h
+            @data.merge(@data_override).to_h.transform_values do |value|
+               case value
+               when Scope
+                  value.to_h
+               else
+                  value
+               end
+            end
          end
 
          def key?(key_name)
