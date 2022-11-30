@@ -215,11 +215,12 @@ describe 'Rake Tasks' do
 
       context '$HOME is defined' do
          let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:secrets_path) { configs_dir / 'secrets.yml' }
 
          it 'should create a secrets file in the XDG_CONFIG_HOME path' do
             task.invoke(name)
 
-            expect(configs_dir / 'secrets.yml').to exist
+            expect(secrets_path).to exist
          end
 
          it 'should encrypt the secrets file' do
@@ -229,7 +230,7 @@ describe 'Rake Tasks' do
 
             box = Lockbox.new(key: default_lockbox_key)
 
-            encrypted = (configs_dir / 'secrets.yml').binread
+            encrypted = secrets_path.binread
 
             expect(box.decrypt(encrypted)).to eq Dirt::Envelope::RakeTasks::SECRETS_TEMPLATE
          end
@@ -250,13 +251,10 @@ describe 'Rake Tasks' do
          end
 
          it 'should state the file it created' do
-            secrets_path = configs_dir / 'secrets.yml'
-
             expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
          end
 
          it 'should abort if the file already exists' do
-            secrets_path = configs_dir / 'secrets.yml'
             configs_dir.mkpath
             secrets_path.write ''
 
@@ -324,7 +322,6 @@ describe 'Rake Tasks' do
          end
 
          it 'should abort if the file already exists' do
-            secrets_path = configs_dir / 'secrets.yml'
             configs_dir.mkpath
             secrets_path.write ''
 
