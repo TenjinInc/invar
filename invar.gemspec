@@ -3,11 +3,11 @@
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
-require 'dirt/envelope/version'
+require 'invar/version'
 
 Gem::Specification.new do |spec|
-   spec.name    = 'dirt-envelope'
-   spec.version = Dirt::Envelope::VERSION
+   spec.name    = 'invar'
+   spec.version = Invar::VERSION
    spec.authors = ['Robin Miller']
    spec.email   = ['robin@tenjin.ca']
 
@@ -16,7 +16,7 @@ Gem::Specification.new do |spec|
       Locates and loads config YAML files based on XDG standard with the encrypted secrets file kept separately.
       Includes useful rake tasks to make management easier. No code execution in config. Rails-independent. Gluten free.
    DESC
-   spec.homepage = 'https://github.com/TenjinInc/dirt-envelope'
+   spec.homepage = 'https://github.com/TenjinInc/invar'
    spec.license  = 'MIT'
    spec.metadata = {
          'rubygems_mfa_required' => 'true'

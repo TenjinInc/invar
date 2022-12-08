@@ -1,15 +1,19 @@
-# ENVelope
+# Invar
 
-Single source of truth for environment and configuration settings.
+Single source of truth for managing application configs, secrets, and environment variable data.
+
+> **Fun Fact:** Invar is named for an [alloy used in clockmaking](https://en.wikipedia.org/wiki/Invar) - it's short for "**invar**iable".
 
 ## Big Picture
+
+Invar's main purpose is to enhance and simplify how applications know about their system environment and config.
 
 Using it in code looks like this:
 
 ```ruby
-envelope = Dirt::Envelope.new(namespace: 'my-app')
+invar = Invar.new(namespace: 'my-app')
 
-db_host = envelope / :config / :database / :host
+db_host = invar / :config / :database / :host
 ```
 
 ### Background
@@ -24,16 +28,14 @@ variables have some downsides:
 * Cannot be easily checked against a schema for early error detection
 * Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
 
-ENVelope's main purpose is to enhance and simplify how applications know about their system environment and config.
-
 ### Features
 
 Here's what this Gem provides:
 
-* *[planned] File schema using [dry-schema](https://dry-rb.org/gems/dry-schema/main/)*
 * File location defaults from
   the [XDG Base Directory](https://en.wikipedia.org/wiki/Freedesktop.org#Base_Directory_Specification)
   file location standard
+* File schema using [dry-schema](https://dry-rb.org/gems/dry-schema/main/)
 * Distinction between configs and secrets
 * Secrets encrypted using [Lockbox](https://github.com/ankane/lockbox)
 * Access configs and ENV variables using symbols or case-insensitive strings.
@@ -44,7 +46,7 @@ Here's what this Gem provides:
 
 ### Anti-Features
 
-Things that ENVelope intentionally does **not** support:
+Things that Invar intentionally does **not** support:
 
 * Multiple config sources
     * No subtle overrides
@@ -129,7 +131,7 @@ or
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'dirt-envelope'
+gem 'invar'
 ```
 
 And then run in a terminal:
@@ -140,36 +142,38 @@ And then run in a terminal:
 
 ### Testing
 
-Envelope automatically loads the normal runtime configuration from the config files created by the Rake tasks (details
-in next section), but tests may need to override some of those values.
+Invar automatically loads the normal runtime configuration from the config files created by the Rake tasks (details in
+next section), but tests may need to override some of those values.
 
 Call `#pretend` on the relevant selector:
 
 ```ruby
-# Your application require Envelope as normal:
-require 'dirt/envelope'
+# Your application require Invar as normal:
+require 'invar'
 
-envelope = Dirt::Envelope.new(namespace: 'my-app')
+invar = Invar.new(namespace: 'my-app')
 
 # ... then, in your test suite:
-require 'dirt/envelope/test'
+require 'invar/test'
 
 # Usually this would be in a test suite hook, 
 # like Cucumber's `BeforeAll` or RSpec's `before(:all)`
-envelope[:config][:theme].pretend dark_mode: true
+invar[:config][:theme].pretend dark_mode: true
 ```
 
-Calling `#pretend` without requiring `dirt/envelope/test` will raise an `ImmutableRealityError`.
+Calling `#pretend` without requiring `invar/test` will raise an `ImmutableRealityError`.
 
-To override values immediately after the config files are read, use an `Envelope.after_load` block:
+To override values immediately after the config files are read, use an `Invar.after_load` block:
 
 ```ruby
-Envelope.after_load do |envelope|
-   envelope[:config][:database].pretend name: 'my_app_test'
+Invar.after_load do |invar|
+   invar[:config][:database].pretend name: 'my_app_test'
 end
 
-# This envelope will return database name 'my_app_test'
-envelope = Dirt::Envelope.new(namespace: 'my-app')
+# This Invar will return database name 'my_app_test'
+invar = Invar.new(namespace: 'my-app')
+
+puts invar / :config / :database
 ```
 
 ### Rake Tasks
@@ -177,7 +181,7 @@ envelope = Dirt::Envelope.new(namespace: 'my-app')
 In your `Rakefile`, add:
 
 ```ruby
-require 'dirt/envelope/rake'
+require 'invar/rake'
 ```
 
 Then you can use the rake tasks as reported by `rake -T`
@@ -186,29 +190,29 @@ Then you can use the rake tasks as reported by `rake -T`
 
 This will show you the XDG search locations.
 
-    bundle exec rake envelope:paths
+    bundle exec rake invar:paths
 
 #### Create Config File
 
-    bundle exec rake envelope:create:configs
+    bundle exec rake invar:create:configs
 
 If a config file already exists in any of the search path locations, it will yell at you.
 
 #### Edit Config File
 
-    bundle exec rake envelope:edit:configs
+    bundle exec rake invar:edit:configs
 
 #### Create Secrets File
 
 To create the config file, run this in a terminal:
 
-    bundle exec rake envelope:create:secrets
+    bundle exec rake invar:create:secrets
 
 It will print out the generated master key. Save it to a password manager.
 
 If you do not want it to be displayed (eg. you're in public), you can pipe it to a file:
 
-    bundle exec rake envelope:create:secrets > master_key
+    bundle exec rake invar:create:secrets > master_key
 
 Then handle the `master_key` file as needed.
 
@@ -216,7 +220,7 @@ Then handle the `master_key` file as needed.
 
 To edit the secrets file, run this and provide the file's encryption key:
 
-    bundle exec rake envelope:edit:secrets
+    bundle exec rake invar:edit:secrets
 
 The file will be decrypted and opened in your default editor (eg. nano). Once you have exited the editor, it will be
 re-encrypted (remember to save, too!).
@@ -244,29 +248,29 @@ database:
 Then in `my-app.rb`, you can fetch those values:
 
 ```ruby
-require 'dirt/envelope'
+require 'invar'
 
-envelope = Dirt::Envelope.new 'my-app'
+invar = Invar.new 'my-app'
 
 # Use the slash operator to fetch values (sort of like Pathname)
-puts envelope / :config / :database / :host
+puts invar / :config / :database / :host
 
 # String keys are okay, too. Also it's case-insensitive
-puts envelope / 'config' / 'database' / 'host'
+puts invar / 'config' / 'database' / 'host'
 
 # Secrets are kept in a separate tree 
-puts envelope / :secret / :database / :username
+puts invar / :secret / :database / :username
 
 # And you can get ENV variables. This should print your HOME directory.
-puts envelope / :config / :home
+puts invar / :config / :home
 
 # You can also use [] notation, which may be nicer in some situations (like #pretend)
-puts envelope[:config][:database][:host]
+puts invar[:config][:database][:host]
 ```
 
-> **FAQ**: Why not support a dot syntax like `envelope.config.database.host`?
+> **FAQ**: Why not support a dot syntax like `invar.config.database.host`?
 >
-> Because key names could collide with method names, like `inspect`, `dup`, or `tap`.
+> **A**: Because key names could collide with method names, like `inspect`, `dup`, or `tap`.
 
 ### Custom Locations
 
@@ -274,7 +278,7 @@ You can customize the search paths by setting the environment variables `XDG_CON
 time you run a Rake task or your application.
 
     # Looks in /tmp instead of ~/.config/ 
-    XDG_CONFIG_HOME=/tmp bundle exec rake envelope:paths
+    XDG_CONFIG_HOME=/tmp bundle exec rake invar:paths
 
 ## Alternatives
 
@@ -287,7 +291,7 @@ Some other gems with different approaches:
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/TenjinInc/dirt-envelope.
+Bug reports and pull requests are welcome on GitHub at https://github.com/TenjinInc/invar.
 
 Valued topics:
 

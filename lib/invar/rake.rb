@@ -5,28 +5,28 @@ require 'io/console'
 require 'tempfile'
 require_relative 'rake_tasks'
 
-namespace :envelope do
+namespace :invar do
    namespace :configs do
       desc 'Create a new configuration file'
       task :create, [:namespace] do |task, args|
-         Dirt::Envelope::RakeTasks::ConfigTask.new(args[:namespace], task).create
+         Invar::RakeTasks::ConfigTask.new(args[:namespace], task).create
       end
 
       desc 'Edit the config in your default editor'
       task :edit, [:namespace] do |task, args|
-         Dirt::Envelope::RakeTasks::ConfigTask.new(args[:namespace], task).edit
+         Invar::RakeTasks::ConfigTask.new(args[:namespace], task).edit
       end
    end
 
    namespace :secrets do
       desc 'Create a new encrypted secrets file'
       task :create, [:namespace] do |task, args|
-         Dirt::Envelope::RakeTasks::SecretTask.new(args[:namespace], task).create
+         Invar::RakeTasks::SecretTask.new(args[:namespace], task).create
       end
 
       desc 'Edit the encrypted secrets file in your default editor'
       task :edit, [:namespace] do |task, args|
-         Dirt::Envelope::RakeTasks::SecretTask.new(args[:namespace], task).edit
+         Invar::RakeTasks::SecretTask.new(args[:namespace], task).edit
       end
    end
 
@@ -42,6 +42,6 @@ namespace :envelope do
 
    desc 'Show directories to be searched for the given namespace'
    task :paths, [:namespace] do |task, args|
-      Dirt::Envelope::RakeTasks::StateTask.new(args[:namespace], task).show_paths
+      Invar::RakeTasks::StateTask.new(args[:namespace], task).show_paths
    end
 end

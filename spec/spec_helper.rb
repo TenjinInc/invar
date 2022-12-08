@@ -6,7 +6,7 @@ SimpleCov.start
 
 $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
-require 'dirt/envelope'
+require 'invar'
 
 require 'pp' # needed to fix a conflict with FakeFS
 require 'fakefs/safe'

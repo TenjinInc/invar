@@ -3,7 +3,7 @@
 require 'spec_helper'
 
 # Intentionally kept separate from main lib require so that folks can use the rake tasks optionally
-require 'dirt/envelope/rake'
+require 'invar/rake'
 
 describe 'Rake Tasks' do
    let(:name) { 'test-app' }
@@ -13,7 +13,7 @@ describe 'Rake Tasks' do
       task.reenable
 
       # Prevent it from opening actual editor
-      allow_any_instance_of(Dirt::Envelope::RakeTasks::NamespacedTask).to receive(:system)
+      allow_any_instance_of(Invar::RakeTasks::NamespacedTask).to receive(:system)
    end
 
    # Silencing the terminal output because there is a lot of it
@@ -25,26 +25,26 @@ describe 'Rake Tasks' do
       $stderr = STDERR
    end
 
-   context 'envelope:configs:create' do
-      let(:task) { ::Rake::Task['envelope:configs:create'] }
+   context 'invar:configs:create' do
+      let(:task) { ::Rake::Task['invar:configs:create'] }
 
       it 'should define a configs create task' do
-         expect(::Rake::Task.task_defined?('envelope:configs:create')).to be true
+         expect(::Rake::Task.task_defined?('invar:configs:create')).to be true
       end
 
       it 'should alias config:create' do
-         expect(::Rake::Task.task_defined?('envelope:config:create')).to be true
+         expect(::Rake::Task.task_defined?('invar:config:create')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
          msg  = 'Namespace argument required'
          hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+         expect { task.invoke }.to raise_error Invar::RakeTasks::NamespaceMissingError,
                                                include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
-         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
          let(:config_path) { configs_dir / 'config.yml' }
 
          it 'should create a config file in the XDG_CONFIG_HOME path' do
@@ -63,7 +63,7 @@ describe 'Rake Tasks' do
 
             msg = <<~MSG
                Abort: File exists. (#{ config_path })
-               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
+               Maybe you meant to edit the file with bundle exec rake invar:secrets:edit[test-app]?
             MSG
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
          end
@@ -71,7 +71,7 @@ describe 'Rake Tasks' do
 
       context '$HOME is undefined' do
          let(:configs_dir) do
-            xdg_default = Dirt::Envelope::XDG::Defaults::CONFIG_DIRS
+            xdg_default = Invar::XDG::Defaults::CONFIG_DIRS
             Pathname.new(ENV.fetch('XDG_CONFIG_DIRS', xdg_default).split(':').first).expand_path / name
          end
          let(:config_path) { configs_dir / 'config.yml' }
@@ -95,25 +95,25 @@ describe 'Rake Tasks' do
       end
    end
 
-   context 'envelope:configs:edit' do
-      let(:task) { ::Rake::Task['envelope:configs:edit'] }
+   context 'invar:configs:edit' do
+      let(:task) { ::Rake::Task['invar:configs:edit'] }
 
       it 'should define a configs edit task' do
-         expect(::Rake::Task.task_defined?('envelope:configs:edit')).to be true
+         expect(::Rake::Task.task_defined?('invar:configs:edit')).to be true
       end
 
       it 'should alias config:create' do
-         expect(::Rake::Task.task_defined?('envelope:config:edit')).to be true
+         expect(::Rake::Task.task_defined?('invar:config:edit')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
          msg  = 'Namespace argument required.'
          hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError, include(msg).and(include(hint))
+         expect { task.invoke }.to raise_error Invar::RakeTasks::NamespaceMissingError, include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
-         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
          let(:config_path) { configs_dir / 'config.yml' }
 
          before(:each) do
@@ -123,7 +123,7 @@ describe 'Rake Tasks' do
 
          it 'should edit the config file in the XDG_CONFIG_HOME path' do
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect_any_instance_of(Dirt::Envelope::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
+            expect_any_instance_of(Invar::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
             task.invoke(name)
          end
@@ -131,14 +131,14 @@ describe 'Rake Tasks' do
          it 'should abort if the file does not exist' do
             config_path.delete
 
-            xdg_home = ENV.fetch('XDG_CONFIG_HOME', Dirt::Envelope::XDG::Defaults::CONFIG_HOME)
-            xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':')
+            xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+            xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
             search_path = [Pathname.new(xdg_home).expand_path / name].concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
 
             msg = <<~MSG
                Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-               Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:configs:create?
+               Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:configs:create?
             MSG
 
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -153,7 +153,7 @@ describe 'Rake Tasks' do
 
       context '$HOME is undefined' do
          let(:search_path) do
-            ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
+            ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
                Pathname.new(p) / name
             end
          end
@@ -173,7 +173,7 @@ describe 'Rake Tasks' do
 
          it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect_any_instance_of(Dirt::Envelope::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
+            expect_any_instance_of(Invar::RakeTasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
             task.invoke(name)
          end
@@ -183,7 +183,7 @@ describe 'Rake Tasks' do
 
             msg = <<~MSG
                Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-               Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:configs:create?
+               Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:configs:create?
             MSG
 
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -195,26 +195,26 @@ describe 'Rake Tasks' do
       end
    end
 
-   context 'envelope:secrets:create' do
-      let(:task) { ::Rake::Task['envelope:secrets:create'] }
+   context 'invar:secrets:create' do
+      let(:task) { ::Rake::Task['invar:secrets:create'] }
 
       it 'should define a secrets create task' do
-         expect(::Rake::Task.task_defined?('envelope:secrets:create')).to be true
+         expect(::Rake::Task.task_defined?('invar:secrets:create')).to be true
       end
 
       it 'should alias secret:create' do
-         expect(::Rake::Task.task_defined?('envelope:secret:create')).to be true
+         expect(::Rake::Task.task_defined?('invar:secret:create')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
          msg  = 'Namespace argument required.'
          hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+         expect { task.invoke }.to raise_error Invar::RakeTasks::NamespaceMissingError,
                                                include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
-         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
          let(:secrets_path) { configs_dir / 'secrets.yml' }
 
          it 'should create a secrets file in the XDG_CONFIG_HOME path' do
@@ -232,13 +232,13 @@ describe 'Rake Tasks' do
 
             encrypted = secrets_path.binread
 
-            expect(box.decrypt(encrypted)).to eq Dirt::Envelope::RakeTasks::SECRETS_TEMPLATE
+            expect(box.decrypt(encrypted)).to eq Invar::RakeTasks::SECRETS_TEMPLATE
          end
 
          it 'should provide instructions for handling the secret' do
             expect do
                task.invoke(name)
-            end.to output(include(Dirt::Envelope::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+            end.to output(include(Invar::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
          end
 
          # this allows easier piping to a file or whatever
@@ -260,7 +260,7 @@ describe 'Rake Tasks' do
 
             msg = <<~MSG
                Abort: File exists. (#{ secrets_path })
-               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
+               Maybe you meant to edit the file with bundle exec rake invar:secrets:edit[test-app]?
             MSG
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
          end
@@ -268,7 +268,7 @@ describe 'Rake Tasks' do
 
       context '$HOME is undefined' do
          let(:search_path) do
-            ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
+            ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
                Pathname.new(p) / name
             end
          end
@@ -297,13 +297,13 @@ describe 'Rake Tasks' do
 
             encrypted = secrets_path.binread
 
-            expect(box.decrypt(encrypted)).to eq Dirt::Envelope::RakeTasks::SECRETS_TEMPLATE
+            expect(box.decrypt(encrypted)).to eq Invar::RakeTasks::SECRETS_TEMPLATE
          end
 
          it 'should provide instructions for handling the secret' do
             expect do
                task.invoke(name)
-            end.to output(include(Dirt::Envelope::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+            end.to output(include(Invar::RakeTasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
          end
 
          # this allows easier piping to a file or whatever
@@ -327,39 +327,39 @@ describe 'Rake Tasks' do
 
             msg = <<~MSG
                Abort: File exists. (#{ secrets_path })
-               Maybe you meant to edit the file with bundle exec rake envelope:secrets:edit[test-app]?
+               Maybe you meant to edit the file with bundle exec rake invar:secrets:edit[test-app]?
             MSG
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
          end
       end
    end
 
-   context 'envelope:secrets:edit' do
-      let(:task) { ::Rake::Task['envelope:secrets:edit'] }
+   context 'invar:secrets:edit' do
+      let(:task) { ::Rake::Task['invar:secrets:edit'] }
 
       before(:each) do
          # Prevent it from opening actual editor
-         allow(Dirt::Envelope::RakeTasks).to receive(:system)
+         allow(Invar::RakeTasks).to receive(:system)
       end
 
       it 'should define a secrets edit task' do
-         expect(::Rake::Task.task_defined?('envelope:secrets:edit')).to be true
+         expect(::Rake::Task.task_defined?('invar:secrets:edit')).to be true
       end
 
       it 'should alias secret:edit' do
-         expect(::Rake::Task.task_defined?('envelope:secret:edit')).to be true
+         expect(::Rake::Task.task_defined?('invar:secret:edit')).to be true
       end
 
       it 'should explode if the namespace argument is missing' do
          msg  = 'Namespace argument required.'
          hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+         expect { task.invoke }.to raise_error Invar::RakeTasks::NamespaceMissingError,
                                                include(msg).and(include(hint))
       end
 
       context '$HOME is defined' do
          let(:home) { '/some/home/dir' }
-         let(:configs_dir) { Pathname.new(Dirt::Envelope::XDG::Defaults::CONFIG_HOME).expand_path / name }
+         let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
          let(:secrets_path) { configs_dir / 'secrets.yml' }
 
          around(:each) do |example|
@@ -445,7 +445,7 @@ describe 'Rake Tasks' do
                it 'should raise an error instead of asking from STDIN' do
                   expect do
                      task.invoke(name)
-                  end.to(raise_error(Dirt::Envelope::SecretsFileEncryptionError).and(output('').to_stderr))
+                  end.to(raise_error(Invar::SecretsFileEncryptionError).and(output('').to_stderr))
                end
             end
          end
@@ -453,14 +453,14 @@ describe 'Rake Tasks' do
          it 'should abort if the file does not exist' do
             secrets_path.delete
 
-            xdg_home = ENV.fetch('XDG_CONFIG_HOME', Dirt::Envelope::XDG::Defaults::CONFIG_HOME)
-            xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':')
+            xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+            xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
             search_path = [Pathname.new(xdg_home).expand_path / name].concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
 
             msg = <<~MSG
                Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-               Maybe you used the wrong namespace or need to create the file with bundle exec rake envelope:secrets:create?
+               Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:secrets:create?
             MSG
 
             expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -486,7 +486,7 @@ describe 'Rake Tasks' do
             allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
             # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-            expect_any_instance_of(Dirt::Envelope::RakeTasks::SecretTask).to receive(:system).with('editor', '/tmp/whatever', exception: true)
+            expect_any_instance_of(Invar::RakeTasks::SecretTask).to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
             task.invoke(name)
          end
@@ -516,19 +516,19 @@ describe 'Rake Tasks' do
       end
    end
 
-   context 'envelope:paths' do
-      let(:task) { ::Rake::Task['envelope:paths'] }
+   context 'invar:paths' do
+      let(:task) { ::Rake::Task['invar:paths'] }
 
       it 'should explode if the namespace argument is missing' do
          msg  = 'Namespace argument required.'
          hint = "Run with: bundle exec rake #{ task.name }[namespace_here]"
-         expect { task.invoke }.to raise_error Dirt::Envelope::RakeTasks::NamespaceMissingError,
+         expect { task.invoke }.to raise_error Invar::RakeTasks::NamespaceMissingError,
                                                include(msg).and(include(hint))
       end
 
       it 'should report the search paths' do
-         xdg_config_home = ENV.fetch('XDG_CONFIG_HOME', Dirt::Envelope::XDG::Defaults::CONFIG_HOME)
-         xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', Dirt::Envelope::XDG::Defaults::CONFIG_DIRS).split(':')
+         xdg_config_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+         xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
          xdg_config_home_path  = Pathname.new(xdg_config_home).expand_path / name
          xdg_config_dirs_paths = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
