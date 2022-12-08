@@ -1,8 +1,6 @@
 # Invar
 
-Single source of truth for managing application configs, secrets, and environment variable data.
-
-> **Fun Fact:** Invar is named for an [alloy used in clockmaking](https://en.wikipedia.org/wiki/Invar) - it's short for "**invar**iable".
+Single source of immutable truth for managing application configs, secrets, and environment variable data.
 
 ## Big Picture
 
@@ -27,6 +25,8 @@ variables have some downsides:
 * Secrets might be stored in plaintext (eg. in cron or scripts). It's better to store secrets as encrypted.
 * Cannot be easily checked against a schema for early error detection
 * Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
+
+> **Fun Fact:** Invar is named for an [alloy used in clockmaking](https://en.wikipedia.org/wiki/Invar) - it's short for "**invar**iable".
 
 ### Features
 
