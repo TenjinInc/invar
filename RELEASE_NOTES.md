@@ -14,7 +14,7 @@
 
 * none
 
-## [0.4.0] - Unreleased beta
+## [0.4.0] - 2022-12-08
 
 ### Major Changes
 
