@@ -315,6 +315,9 @@ push git commits and tags, and push the `.gem` file to [rubygems.org](https://ru
 Documentation is produced by Yard. Run `bundle exec rake yard`. The goal is to have 100% documentation coverage and 100%
 test coverage.
 
+Release notes are provided in `RELEASE_NOTES.md`, and should vaguely
+follow [Keep A Changelog](https://keepachangelog.com/en/1.0.0/) recommendations.
+
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).

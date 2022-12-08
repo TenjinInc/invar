@@ -1,6 +1,35 @@
 # Release Notes
 
-## 0.3.0 (Unreleased)
+## [Unreleased]
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
+* none
+
+## [0.4.0] - Unreleased beta
+
+### Major Changes
+
+* Renamed project to Invar
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
+* `#pretend` symbolizes provided key(s)
+* `Scope#to_h` recursively calls `.to_h` on subscopes
+
+## [0.3.0] - Unreleased beta
 
 ### Major Changes
 
@@ -15,7 +44,7 @@
 
 * none
 
-## 0.2.0 (Unreleased)
+## [0.2.0] - Unreleased beta
 
 ### Major Changes
 
@@ -31,7 +60,7 @@
 
 * none
 
-## 0.1.0 (Unreleased)
+## [0.1.0] - Unreleased beta
 
 ### Major Changes
 
