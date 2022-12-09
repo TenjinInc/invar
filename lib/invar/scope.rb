@@ -30,6 +30,9 @@ module Invar
          raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::MSG
       end
 
+      # Returns a hash representation of this scope and subscopes.
+      #
+      # @return [Hash] a hash representation of this scope
       def to_h
          @data.merge(@data_override).to_h.transform_values do |value|
             case value

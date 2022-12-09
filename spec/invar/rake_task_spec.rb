@@ -316,8 +316,6 @@ describe 'Rake Tasks' do
          end
 
          it 'should state the file it created' do
-            secrets_path = configs_dir / 'secrets.yml'
-
             expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
          end
 

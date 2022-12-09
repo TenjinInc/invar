@@ -8,7 +8,6 @@ $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
 require 'invar'
 
-require 'pp' # needed to fix a conflict with FakeFS
 require 'fakefs/safe'
 require 'fakefs/spec_helpers'
 
