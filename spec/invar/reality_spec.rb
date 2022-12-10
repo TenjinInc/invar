@@ -64,10 +64,7 @@ module Invar
             key_file.write default_lockbox_key
             key_file.chmod 0o600
 
-            invar = described_class.new namespace: name do
-               required(:configs)
-               required(:secrets)
-            end
+            invar = described_class.new namespace: name
 
             expect(invar).to be_frozen
          end
@@ -226,10 +223,7 @@ module Invar
 
                it 'should NOT ask for it from STDIN' do
                   expect do
-                     described_class.new namespace: name do
-                        required(:configs)
-                        required(:secrets)
-                     end
+                     described_class.new namespace: name
                   end.to_not output.to_stderr
                end
 
@@ -238,10 +232,7 @@ module Invar
                   Lockbox.master_key = default_lockbox_key
 
                   expect do
-                     described_class.new namespace: name do
-                        required(:configs)
-                        required(:secrets)
-                     end
+                     described_class.new namespace: name
                   end.to_not output.to_stderr
 
                   Lockbox.master_key = old_key
@@ -257,10 +248,7 @@ module Invar
 
                it 'should read from a Pathname key file' do
                   expect do
-                     described_class.new namespace: name, decryption_keyfile: key_file do
-                        required(:configs)
-                        required(:secrets)
-                     end
+                     described_class.new namespace: name, decryption_keyfile: key_file
                   end.to_not output.to_stderr
                end
 
@@ -269,10 +257,7 @@ module Invar
                   key_path.write "\n\n \t#{ default_lockbox_key }\t \n"
 
                   expect do
-                     described_class.new namespace: name, decryption_keyfile: key_file do
-                        required(:configs)
-                        required(:secrets)
-                     end
+                     described_class.new namespace: name, decryption_keyfile: key_file
                   end.to_not output.to_stderr
                end
 
@@ -281,10 +266,7 @@ module Invar
                      key_path.chmod(mode)
 
                      expect do
-                        described_class.new namespace: name, decryption_keyfile: key_file do
-                           required(:configs)
-                           required(:secrets)
-                        end
+                        described_class.new namespace: name, decryption_keyfile: key_file
                      end.to_not raise_error
                   end
                end
@@ -357,10 +339,7 @@ module Invar
                   expect(input).to receive(:noecho).and_return default_lockbox_key
 
                   $stderr = StringIO.new
-                  described_class.new namespace: name do
-                     required(:configs)
-                     required(:secrets)
-                  end
+                  described_class.new namespace: name
                   $stderr = STDERR
 
                   $stdin = STDIN

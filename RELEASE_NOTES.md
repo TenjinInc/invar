@@ -10,6 +10,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Major Changes
 
 * Renamed `Invar::Invar` to `Invar::Reality`
+* Maintenance Rake task inclusion now requires explicit define call
 
 ### Minor Changes
 

@@ -181,7 +181,9 @@ puts invar / :config / :database
 In your `Rakefile`, add:
 
 ```ruby
-require 'invar/rake'
+require 'invar/rake/tasks'
+
+Invar::Rake::Tasks.define namespace: 'app-name-here'
 ```
 
 Then you can use the rake tasks as reported by `rake -T`
