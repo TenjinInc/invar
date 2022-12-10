@@ -361,6 +361,19 @@ module Invar
                         end.to(raise_error(SecretsFileDecryptionError))
                      end.to_not output.to_stderr
                   end
+
+                  it 'should have a useful error message' do
+                     msg = "Could not find file '#{ Reality::DEFAULT_KEY_FILE_NAME }'."
+
+                     # TODO: Would be better to control the XDG env vars here once something like Climate Control is added
+                     search_paths = ([XDG::Defaults::CONFIG_HOME] + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
+                        Pathname.new(p).expand_path / name
+                     end.join(', ')
+
+                     expect do
+                        described_class.new namespace: name
+                     end.to raise_error SecretsFileDecryptionError, include(msg).and(include(search_paths))
+                  end
                end
             end
 

@@ -79,7 +79,7 @@ module Invar
          end
 
          begin
-            @secrets = Scope.new(load_secrets(locator, decryption_keyfile))
+            @secrets = Scope.new(load_secrets(locator, decryption_keyfile || DEFAULT_KEY_FILE_NAME))
          rescue FileLocator::FileNotFoundError
             raise MissingSecretsFileError,
                   "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
@@ -160,7 +160,7 @@ module Invar
       end
 
       def resolve_key(pathname, locator, prompt)
-         key_file = locator.find(pathname || DEFAULT_KEY_FILE_NAME)
+         key_file = locator.find(pathname)
 
          read_keyfile(key_file)
       rescue FileLocator::FileNotFoundError
@@ -169,7 +169,7 @@ module Invar
             $stdin.noecho(&:gets).strip
          else
             raise SecretsFileDecryptionError,
-                  "Could not find file '#{ pathname }'. Searched in: #{ locator.search_paths }"
+                  "Could not find file '#{ pathname }'. Searched in: #{ locator.search_paths.join(', ') }"
          end
       end
 
