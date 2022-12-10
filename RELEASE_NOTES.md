@@ -9,6 +9,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Major Changes
 
+* none
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
+* Fixed error message that showed blank filename when looking for lockbox master keyfile
+
+## [0.5.0] - 2022-12-09
+
+### Major Changes
+
 * Renamed `Invar::Invar` to `Invar::Reality`
 * Maintenance Rake task inclusion now requires explicit define call
 
@@ -50,7 +64,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * none
 
-## [0.2.0] - Unreleased beta
+## [0.2.0] - Unreleased Prototype
 
 ### Major Changes
 
@@ -66,7 +80,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * none
 
-## [0.1.0] - Unreleased beta
+## [0.1.0] - Unreleased Prototype
 
 ### Major Changes
 
