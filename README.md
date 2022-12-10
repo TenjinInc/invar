@@ -274,6 +274,54 @@ puts invar[:config][:database][:host]
 >
 > **A**: Because key names could collide with method names, like `inspect`, `dup`, or `tap`.
 
+### Validation
+
+You may provide `:configs_schema` and `:secrets_schema` keyword arguments to `Invar.new` and it will use those schema to
+validate your `Invar::Reality`.
+
+> **Note** Invar uses dry-schema to validate its internal `configs` and `secrets` trees, not the raw file contents.
+
+`dry-schema` has a lot of shorthand which can add a lot of complexity, but here's a crash course:
+
+* Keys are declared with the `required` method while the value's validator is declared to be a general `schema` type
+  with an accompanying block.
+* In that block are the units of validation logic (*"predicates"*)
+    * They get unioned together with a **single** `&`
+      operator, **not** double `&&` like a boolean expression.
+    * There are predefined predicates for a bunch of simple properties
+
+Generally when used with Invar it will look like:
+
+```ruby
+require 'invar'
+
+cnf_schema = Dry::Schema.define do
+   required(:upload).schema do
+      required(:mysql) { str? & filled? }
+   end
+
+   required(:upload).schema do
+      required(:max_bytes) { int? & filled? & gt?(0) }
+      required(:timeout) { int? & filled? & gt?(0) }
+   end
+   # ...
+end
+
+sec_schema = Dry::Schema.define do
+   required(:email).schema do
+      required(:username) { str? & filled? }
+      required(:password) { str? & filled? }
+   end
+   # ...
+end
+
+invar = Invar.new 'my-app', configs_schema: cnf_schema, secrets_schema: sec_schema
+# ...
+```
+
+If there are any unexpected or invalid keys in the *configs* or *secrets* files, Invar will complain about it with
+a `SchemaValidationError`.
+
 ### Custom Locations
 
 You can customize the search paths by setting the environment variables `XDG_CONFIG_HOME` and/or `XDG_CONFIG_DIRS` any
@@ -281,6 +329,16 @@ time you run a Rake task or your application.
 
     # Looks in /tmp instead of ~/.config/ 
     XDG_CONFIG_HOME=/tmp bundle exec rake invar:paths
+
+You can also specify the Lockbox decryption keyfile (eg. for automated production environments) by using the
+`:decryption_keyfile` keyword argument to `Invar.new`. Be aware that your secrets are only as secure as the file that
+keeps the master key, so double check that its file permissions are as restricted as possible.
+
+```ruby
+require 'invar'
+
+invar = Invar.new 'my-app', decryption_keyfile: '/etc/my-app/master_key'
+```
 
 ## Alternatives
 
