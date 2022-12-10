@@ -17,6 +17,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Bugfixes
 
+* none
+
+## [0.5.1] - 2022-12-10
+
+### Major Changes
+
+*none
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
 * Fixed error message that showed blank filename when looking for lockbox master keyfile
 
 ## [0.5.0] - 2022-12-09
