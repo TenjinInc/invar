@@ -174,20 +174,24 @@ module Invar
       end
 
       def read_keyfile(key_file)
-         permissions_mask = 0o777 # only the lowest three digits are perms, so masking
-         stat             = key_file.stat
-         file_mode        = stat.mode & permissions_mask
-         # TODO: use stat.world_readable? etc instead
-         unless ALLOWED_LOCKFILE_MODES.include? file_mode
-            hint = "Try: chmod 600 #{ key_file }"
-            raise SecretsFileDecryptionError,
-                  format("File '%<path>s' has improper permissions (%<mode>04o). %<hint>s",
-                         path: key_file,
-                         mode: file_mode,
-                         hint: hint)
-         end
+         verify_permissions! key_file
 
          key_file.read.strip
+      end
+
+      def verify_permissions!(file)
+         permissions_mask = 0o777 # only the lowest three digits are perms, so masking
+         stat             = file.stat
+         file_mode        = stat.mode & permissions_mask
+         # TODO: use stat.world_readable? etc instead
+         return if ALLOWED_LOCKFILE_MODES.include? file_mode
+
+         msg = format("File '%<path>s' has improper permissions (%<mode>04o). %<hint>s",
+                      path: file,
+                      mode: file_mode,
+                      hint: "Try: chmod 600 #{ file }")
+
+         raise SecretsFileDecryptionError, msg
       end
 
       # Validates a Reality object
