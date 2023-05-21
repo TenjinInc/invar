@@ -22,6 +22,10 @@ module Invar
             ---
          YML
 
+         CREATE_SUGGESTION = <<~SUGGESTION
+            Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:init?
+         SUGGESTION
+
          # Shorthand for Invar::Rake::Tasks.new.define
          #
          # @param (see #define)
@@ -44,51 +48,57 @@ module Invar
 
          def define_all_tasks(app_namespace)
             namespace :invar do
-               define_config_tasks(app_namespace)
-               define_secrets_tasks(app_namespace)
+               define_init_task(app_namespace)
+
+               define_config_task(app_namespace)
+               define_secrets_task(app_namespace)
 
                define_info_tasks(app_namespace)
             end
          end
 
-         def define_config_tasks(app_namespace)
-            namespace :configs do
-               desc 'Create a new configuration file'
-               task :create do
-                  ::Invar::Rake::Tasks::ConfigTask.new(app_namespace).create
+         def define_init_task(app_namespace)
+            desc 'Create new configuration and encrypted secrets files'
+            task :init, [:mode] do |_task, args|
+               mode = args.mode
+
+               config  = ::Invar::Rake::Tasks::ConfigTask.new(app_namespace)
+               secrets = ::Invar::Rake::Tasks::SecretTask.new(app_namespace)
+
+               case mode
+               when 'config'
+                  secrets = nil
+               when 'secrets'
+                  config = nil
+               else
+                  raise "unknown mode #{ mode }. Must be one of 'config' or 'secrets'" unless mode.nil?
                end
 
-               desc 'Edit the config in your default editor'
-               task :edit do
-                  ::Invar::Rake::Tasks::ConfigTask.new(app_namespace).edit
-               end
-            end
+               assert_init_conditions(config&.file_path, secrets&.file_path)
 
-            # alias
-            namespace :config do
-               task create: ['configs:create']
-               task edit: ['configs:edit']
+               config&.create
+               secrets&.create
             end
          end
 
-         def define_secrets_tasks(app_namespace)
-            namespace :secrets do
-               desc 'Create a new encrypted secrets file'
-               task :create do
-                  ::Invar::Rake::Tasks::SecretTask.new(app_namespace).create
-               end
-
-               desc 'Edit the encrypted secrets file in your default editor'
-               task :edit do
-                  ::Invar::Rake::Tasks::SecretTask.new(app_namespace).edit
-               end
+         def define_config_task(app_namespace)
+            desc 'Edit the config in your default editor'
+            task :configs do
+               ::Invar::Rake::Tasks::ConfigTask.new(app_namespace).edit
             end
 
             # alias
-            namespace :secret do
-               task create: ['secrets:create']
-               task edit: ['secrets:edit']
+            task config: ['configs']
+         end
+
+         def define_secrets_task(app_namespace)
+            desc 'Edit the encrypted secrets file in your default editor'
+            task :secrets do
+               ::Invar::Rake::Tasks::SecretTask.new(app_namespace).edit
             end
+
+            # alias
+            task secret: ['secrets']
          end
 
          def define_info_tasks(app_namespace)
@@ -98,10 +108,44 @@ module Invar
             end
          end
 
+         def assert_init_conditions(config_file, secrets_file)
+            return unless config_file&.exist? || secrets_file&.exist?
+
+            msg = if !config_file&.exist?
+                     <<~MSG
+                        Abort: Secrets file already exists (#{ secrets_file })
+                        Run this to init only the config file: bundle exec rake tasks invar:init[config]
+                     MSG
+                  elsif !secrets_file&.exist?
+                     <<~MSG
+                        Abort: Config file already exists (#{ config_file })
+                        Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]
+                     MSG
+                  else
+                     <<~MSG
+                        Abort: Files already exist (#{ config_file }, #{ secrets_file })
+                        Maybe you meant to edit the file using rake tasks invar:config or invar:secrets?
+                     MSG
+                  end
+
+            warn msg
+            exit 1
+         end
+
          # Tasks that use a namespace for file searching
          class NamespacedTask
             def initialize(namespace)
                @locator = FileLocator.new(namespace)
+            end
+
+            def file_path
+               config_dir / filename
+            end
+
+            private
+
+            def config_dir
+               @locator.search_paths.first
             end
          end
 
@@ -109,21 +153,12 @@ module Invar
          class ConfigTask < NamespacedTask
             # Creates a config file in the appropriate location
             def create
-               config_dir = @locator.search_paths.first
+               raise 'File already exists' if file_path.exist?
+
                config_dir.mkpath
+               file_path.write CONFIG_TEMPLATE
 
-               file = config_dir / 'config.yml'
-               if file.exist?
-                  warn <<~MSG
-                     Abort: File exists. (#{ file })
-                     Maybe you meant to edit the file with bundle exec rake invar:secrets:edit?
-                  MSG
-                  exit 1
-               end
-
-               file.write CONFIG_TEMPLATE
-
-               warn "Created file: #{ file }"
+               warn "Created file: #{ file_path }"
             end
 
             # Edits the existing config file in the appropriate location
@@ -133,7 +168,7 @@ module Invar
                               rescue ::Invar::FileLocator::FileNotFoundError => e
                                  warn <<~ERR
                                     Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
-                                    Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:configs:create?
+                                    #{ CREATE_SUGGESTION }
                                  ERR
                                  exit 1
                               end
@@ -141,6 +176,12 @@ module Invar
                system(ENV.fetch('EDITOR', 'editor'), configs_file.to_s, exception: true)
 
                warn "File saved to: #{ configs_file }"
+            end
+
+            private
+
+            def filename
+               'config.yml'
             end
          end
 
@@ -153,24 +194,13 @@ module Invar
 
             # Creates a new encrypted secrets file and prints the generated encryption key to STDOUT
             def create
-               config_dir = @locator.search_paths.first
-               config_dir.mkpath
-
-               file = config_dir / 'secrets.yml'
-
-               if file.exist?
-                  warn <<~ERR
-                     Abort: File exists. (#{ file })
-                     Maybe you meant to edit the file with bundle exec rake invar:secrets:edit?
-                  ERR
-                  exit 1
-               end
+               raise 'File already exists' if file_path.exist?
 
                encryption_key = Lockbox.generate_key
 
-               write_encrypted_file(file, encryption_key, SECRETS_TEMPLATE)
+               write_encrypted_file(file_path, encryption_key, SECRETS_TEMPLATE)
 
-               warn "Created file #{ file }"
+               warn "Created file #{ file_path }"
 
                warn SECRETS_INSTRUCTIONS
                warn 'Generated key is:'
@@ -185,7 +215,7 @@ module Invar
                               rescue ::Invar::FileLocator::FileNotFoundError => e
                                  warn <<~ERR
                                     Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
-                                    Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:secrets:create?
+                                    #{ CREATE_SUGGESTION }
                                  ERR
                                  exit 1
                               end
@@ -197,11 +227,16 @@ module Invar
 
             private
 
+            def filename
+               'secrets.yml'
+            end
+
             def write_encrypted_file(file_path, encryption_key, content)
                lockbox = Lockbox.new(key: encryption_key)
 
                encrypted_data = lockbox.encrypt(content)
 
+               config_dir.mkpath
                # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
                File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
             end
@@ -251,4 +286,3 @@ module Invar
       end
    end
 end
-

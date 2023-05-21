@@ -54,49 +54,139 @@ module Invar
                $stderr = STDERR
             end
 
-            context 'invar:configs:create' do
-               let(:task) { ::Rake::Task['invar:configs:create'] }
+            context 'invar:init' do
+               let(:task) { ::Rake::Task['invar:init'] }
 
-               it 'should define a configs create task' do
-                  expect(::Rake::Task.task_defined?('invar:configs:create')).to be true
-               end
-
-               it 'should alias config:create' do
-                  expect(::Rake::Task.task_defined?('invar:config:create')).to be true
+               it 'should define an init task' do
+                  expect(::Rake::Task.task_defined?('invar:init')).to be true
                end
 
                context '$HOME is defined' do
                   let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                   let(:config_path) { configs_dir / 'config.yml' }
+                  let(:secrets_path) { configs_dir / 'secrets.yml' }
 
                   it 'should create a config file in the XDG_CONFIG_HOME path' do
-                     task.invoke(name)
+                     task.invoke
 
                      expect(config_path).to exist
                   end
 
-                  it 'should state the file it created' do
-                     expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
+                  it 'should create a secrets file in the XDG_CONFIG_HOME path' do
+                     task.invoke
+
+                     expect(secrets_path).to exist
                   end
 
-                  it 'should abort if the file already exists' do
-                     configs_dir.mkpath
-                     config_path.write ''
+                  it 'should only init config when specified' do
+                     task.invoke('config')
 
-                     msg = <<~MSG
-                        Abort: File exists. (#{ config_path })
-                        Maybe you meant to edit the file with bundle exec rake invar:secrets:edit?
-                     MSG
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                     expect(config_path).to exist
+                     expect(secrets_path).to_not exist
+                  end
+
+                  it 'should only init secrets when specified' do
+                     task.invoke('secrets')
+
+                     expect(config_path).to_not exist
+                     expect(secrets_path).to exist
+                  end
+
+                  it 'should declare the files it created' do
+                     expected_output = include(config_path.to_s).and include(secrets_path.to_s)
+
+                     expect { task.invoke }.to output(expected_output).to_stderr
+                  end
+
+                  it 'should encrypt the secrets file' do
+                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+                     task.invoke
+
+                     box = Lockbox.new(key: default_lockbox_key)
+
+                     encrypted = secrets_path.binread
+
+                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
+                  end
+
+                  it 'should provide instructions for handling the secret' do
+                     expect do
+                        task.invoke
+                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+                  end
+
+                  # this allows easier piping to a file or whatever
+                  it 'should print the secret to stdout' do
+                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+                     expect do
+                        task.invoke
+                     end.to output(include(default_lockbox_key)).to_stdout
+                  end
+
+                  context 'both files already exist' do
+                     before do
+                        configs_dir.mkpath
+                        config_path.write ''
+                        secrets_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Files already exist (#{ config_path }, #{ secrets_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest editing' do
+                        suggestion = 'Maybe you meant to edit the file using rake tasks invar:config or invar:secrets?'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
+                  end
+
+                  context 'config file already exists' do
+                     before do
+                        configs_dir.mkpath
+                        config_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Config file already exists (#{ config_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest using secrets parameter' do
+                        suggestion = 'Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
+                  end
+
+                  context 'secrets file already exists' do
+                     before do
+                        configs_dir.mkpath
+                        secrets_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Secrets file already exists (#{ secrets_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest using config parameter' do
+                        suggestion = 'Run this to init only the config file: bundle exec rake tasks invar:init[config]'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
                   end
                end
 
                context '$HOME is undefined' do
-                  let(:configs_dir) do
-                     xdg_default = Invar::XDG::Defaults::CONFIG_DIRS
-                     Pathname.new(ENV.fetch('XDG_CONFIG_DIRS', xdg_default).split(':').first).expand_path / name
+                  let(:search_path) do
+                     ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
+                        Pathname.new(p) / name
+                     end
                   end
+                  let(:configs_dir) { search_path.first }
                   let(:config_path) { configs_dir / 'config.yml' }
+                  let(:secrets_path) { configs_dir / 'secrets.yml' }
 
                   around(:each) do |example|
                      old_home = Dir.home
@@ -106,26 +196,112 @@ module Invar
                   end
 
                   it 'should create a config file in the first XDG_CONFIG_DIRS path' do
-                     task.invoke(name)
+                     task.invoke
 
                      expect(config_path).to exist
                   end
 
-                  it 'should state the file it created' do
-                     expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
+                  it 'should create a secrets file in the first XDG_CONFIG_DIRS path' do
+                     task.invoke
+
+                     expect(secrets_path).to exist
+                  end
+
+                  it 'should declare the files it created' do
+                     expected_output = include(config_path.to_s).and(include(secrets_path.to_s))
+                     expect { task.invoke }.to output(expected_output).to_stderr
+                  end
+
+                  it 'should encrypt the secrets file' do
+                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+                     task.invoke
+
+                     box = Lockbox.new(key: default_lockbox_key)
+
+                     encrypted = secrets_path.binread
+
+                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
+                  end
+
+                  it 'should provide instructions for handling the secret' do
+                     expect do
+                        task.invoke
+                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+                  end
+
+                  # this allows easier piping to a file or whatever
+                  it 'should print the decryption key to stdout' do
+                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+
+                     expect do
+                        task.invoke
+                     end.to output(include(default_lockbox_key)).to_stdout
+                  end
+
+                  context 'both files already exist' do
+                     before do
+                        configs_dir.mkpath
+                        config_path.write ''
+                        secrets_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Files already exist (#{ config_path }, #{ secrets_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest editing' do
+                        suggestion = 'Maybe you meant to edit the file using rake tasks invar:config or invar:secrets?'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
+                  end
+
+                  context 'config file already exists' do
+                     before do
+                        configs_dir.mkpath
+                        config_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Config file already exists (#{ config_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest using secrets parameter' do
+                        suggestion = 'Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
+                  end
+
+                  context 'secrets file already exists' do
+                     before do
+                        configs_dir.mkpath
+                        secrets_path.write ''
+                     end
+
+                     it 'should abort' do
+                        msg = "Abort: Secrets file already exists (#{ secrets_path })"
+                        expect { task.invoke }.to output(include(msg)).to_stderr.and(raise_error(SystemExit))
+                     end
+
+                     it 'should suggest using config parameter' do
+                        suggestion = 'Run this to init only the config file: bundle exec rake tasks invar:init[config]'
+                        expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
+                     end
                   end
                end
             end
 
-            context 'invar:configs:edit' do
-               let(:task) { ::Rake::Task['invar:configs:edit'] }
+            context 'invar:configs' do
+               let(:task) { ::Rake::Task['invar:configs'] }
 
                it 'should define a configs edit task' do
-                  expect(::Rake::Task.task_defined?('invar:configs:edit')).to be true
+                  expect(::Rake::Task.task_defined?('invar:configs')).to be true
                end
 
-               it 'should alias config:create' do
-                  expect(::Rake::Task.task_defined?('invar:config:edit')).to be true
+               it 'should alias config to configs' do
+                  expect(::Rake::Task.task_defined?('invar:config')).to be true
                end
 
                context '$HOME is defined' do
@@ -141,7 +317,7 @@ module Invar
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
                      expect_any_instance_of(Invar::Rake::Tasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
-                     task.invoke(name)
+                     task.invoke
                   end
 
                   it 'should abort if the file does not exist' do
@@ -154,16 +330,16 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-                        Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:configs:create?
+                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
                      MSG
 
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
                   end
 
                   it 'should state the file saved' do
                      config_path = configs_dir / 'config.yml'
 
-                     expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
+                     expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
                   end
                end
 
@@ -191,7 +367,7 @@ module Invar
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
                      expect_any_instance_of(Invar::Rake::Tasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
 
-                     task.invoke(name)
+                     task.invoke
                   end
 
                   it 'should abort if the file does not exist' do
@@ -199,150 +375,20 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-                        Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:configs:create?
+                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
                      MSG
 
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
                   end
 
                   it 'should state the file saved' do
-                     expect { task.invoke(name) }.to output(include(config_path.to_s)).to_stderr
+                     expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
                   end
                end
             end
 
-            context 'invar:secrets:create' do
-               let(:task) { ::Rake::Task['invar:secrets:create'] }
-
-               it 'should define a secrets create task' do
-                  expect(::Rake::Task.task_defined?('invar:secrets:create')).to be true
-               end
-
-               it 'should alias secret:create' do
-                  expect(::Rake::Task.task_defined?('invar:secret:create')).to be true
-               end
-
-               context '$HOME is defined' do
-                  let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
-                  let(:secrets_path) { configs_dir / 'secrets.yml' }
-
-                  it 'should create a secrets file in the XDG_CONFIG_HOME path' do
-                     task.invoke(name)
-
-                     expect(secrets_path).to exist
-                  end
-
-                  it 'should encrypt the secrets file' do
-                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
-
-                     task.invoke(name)
-
-                     box = Lockbox.new(key: default_lockbox_key)
-
-                     encrypted = secrets_path.binread
-
-                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
-                  end
-
-                  it 'should provide instructions for handling the secret' do
-                     expect do
-                        task.invoke(name)
-                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
-                  end
-
-                  # this allows easier piping to a file or whatever
-                  it 'should print the secret to stdout' do
-                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
-
-                     expect do
-                        task.invoke(name)
-                     end.to output(include(default_lockbox_key)).to_stdout
-                  end
-
-                  it 'should state the file it created' do
-                     expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
-                  end
-
-                  it 'should abort if the file already exists' do
-                     configs_dir.mkpath
-                     secrets_path.write ''
-
-                     msg = <<~MSG
-                        Abort: File exists. (#{ secrets_path })
-                        Maybe you meant to edit the file with bundle exec rake invar:secrets:edit?
-                     MSG
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
-                  end
-               end
-
-               context '$HOME is undefined' do
-                  let(:search_path) do
-                     ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
-                        Pathname.new(p) / name
-                     end
-                  end
-                  let(:configs_dir) { search_path.first }
-                  let(:secrets_path) { configs_dir / 'secrets.yml' }
-
-                  around(:each) do |example|
-                     old_home = Dir.home
-                     ENV.delete('HOME')
-                     example.run
-                     ENV['HOME'] = old_home
-                  end
-
-                  it 'should create a secrets file in the first XDG_CONFIG_DIRS path' do
-                     task.invoke(name)
-
-                     expect(secrets_path).to exist
-                  end
-
-                  it 'should encrypt the secrets file' do
-                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
-
-                     task.invoke(name)
-
-                     box = Lockbox.new(key: default_lockbox_key)
-
-                     encrypted = secrets_path.binread
-
-                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
-                  end
-
-                  it 'should provide instructions for handling the secret' do
-                     expect do
-                        task.invoke(name)
-                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
-                  end
-
-                  # this allows easier piping to a file or whatever
-                  it 'should print the secret to stdout' do
-                     allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
-
-                     expect do
-                        task.invoke(name)
-                     end.to output(include(default_lockbox_key)).to_stdout
-                  end
-
-                  it 'should state the file it created' do
-                     expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
-                  end
-
-                  it 'should abort if the file already exists' do
-                     configs_dir.mkpath
-                     secrets_path.write ''
-
-                     msg = <<~MSG
-                        Abort: File exists. (#{ secrets_path })
-                        Maybe you meant to edit the file with bundle exec rake invar:secrets:edit?
-                     MSG
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
-                  end
-               end
-            end
-
-            context 'invar:secrets:edit' do
-               let(:task) { ::Rake::Task['invar:secrets:edit'] }
+            context 'invar:secrets' do
+               let(:task) { ::Rake::Task['invar:secrets'] }
 
                before(:each) do
                   # Prevent it from opening actual editor
@@ -350,11 +396,11 @@ module Invar
                end
 
                it 'should define a secrets edit task' do
-                  expect(::Rake::Task.task_defined?('invar:secrets:edit')).to be true
+                  expect(::Rake::Task.task_defined?('invar:secrets')).to be true
                end
 
-               it 'should alias secret:edit' do
-                  expect(::Rake::Task.task_defined?('invar:secret:edit')).to be true
+               it 'should alias secret to secrets' do
+                  expect(::Rake::Task.task_defined?('invar:secret')).to be true
                end
 
                context '$HOME is defined' do
@@ -395,7 +441,7 @@ module Invar
 
                         expect do
                            $stdin = double('fake IO', noecho: default_lockbox_key)
-                           task.invoke(name)
+                           task.invoke
                            $stdin = STDIN
                         end.to_not output(include(msg)).to_stderr
                      end
@@ -415,7 +461,7 @@ module Invar
 
                            expect do
                               $stdin = double('fake IO', noecho: default_lockbox_key)
-                              task.invoke(name)
+                              task.invoke
                               $stdin = STDIN
                            end.to output(start_with(msg)).to_stderr
                         end
@@ -427,7 +473,7 @@ module Invar
 
                            expect(input).to receive(:noecho).and_return default_lockbox_key
 
-                           task.invoke(name)
+                           task.invoke
 
                            $stdin = STDIN
                         end
@@ -444,7 +490,7 @@ module Invar
 
                         it 'should raise an error instead of asking from STDIN' do
                            expect do
-                              task.invoke(name)
+                              task.invoke
                            end.to(raise_error(Invar::SecretsFileEncryptionError).and(output('').to_stderr))
                         end
                      end
@@ -460,10 +506,10 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-                        Maybe you used the wrong namespace or need to create the file with bundle exec rake invar:secrets:create?
+                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
                      MSG
 
-                     expect { task.invoke(name) }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
                   end
 
                   it 'should clone the decrypted contents into the tempfile' do
@@ -476,7 +522,7 @@ module Invar
                      expect(tmpfile).to receive(:write).with("---\n")
                      expect(tmpfile).to receive(:rewind)
 
-                     task.invoke(name)
+                     task.invoke
                   end
 
                   it 'should edit the secrets tmpfile' do
@@ -488,7 +534,7 @@ module Invar
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
                      expect_any_instance_of(Invar::Rake::Tasks::SecretTask).to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
-                     task.invoke(name)
+                     task.invoke
                   end
 
                   it 'should update the encrypted file with new contents' do
@@ -501,7 +547,7 @@ module Invar
                      tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
                      allow(Tempfile).to receive(:create).and_yield tmpfile
 
-                     task.invoke(name)
+                     task.invoke
 
                      lockbox = Lockbox.new(key: default_lockbox_key)
 
@@ -511,7 +557,7 @@ module Invar
                   it 'should state the file saved' do
                      Lockbox.master_key = default_lockbox_key
 
-                     expect { task.invoke(name) }.to output(include(secrets_path.to_s)).to_stderr
+                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
                   end
                end
             end
@@ -532,7 +578,7 @@ module Invar
                   ERR
 
                   expect do
-                     task.invoke(name)
+                     task.invoke
                   end.to output(expected_stderr).to_stderr
                end
             end

@@ -148,32 +148,32 @@ next section), but tests may need to override some of those values.
 Call `#pretend` on the relevant selector:
 
 ```ruby
-# Your application require Invar as normal:
+# Your application uses Invar as normal:
 require 'invar'
 
 invar = Invar.new(namespace: 'my-app')
 
-# ... then, in your test suite:
+# ... but in your test suite, require the testing extension
 require 'invar/test'
 
-# Usually this would be in a test suite hook, 
-# like Cucumber's `BeforeAll` or RSpec's `before(:all)`
-invar[:config][:theme].pretend dark_mode: true
+# And override the values as needed. Usually this would be in a test
+# suite hook, like Cucumber's `BeforeAll` or RSpec's `before(:all)`
+invar[:config][:mysql].pretend database: 'myapp_test'
 ```
 
-Calling `#pretend` without requiring `invar/test` will raise an `ImmutableRealityError`.
+**Note**: Calling `#pretend` without requiring `invar/test` will raise an `ImmutableRealityError`.
 
 To override values immediately after the config files are read, use an `Invar.after_load` block:
 
 ```ruby
 Invar.after_load do |invar|
-   invar[:config][:database].pretend name: 'my_app_test'
+   invar[:config][:postgres].pretend database: 'my_app_test'
 end
 
 # This Invar will return database name 'my_app_test'
 invar = Invar.new(namespace: 'my-app')
 
-puts invar / :config / :database
+puts invar / :config / :postgres
 ```
 
 ### Rake Tasks
@@ -194,38 +194,36 @@ This will show you the XDG search locations.
 
     bundle exec rake invar:paths
 
-#### Create Config File
+#### Create Config and Secrets Files
 
-    bundle exec rake invar:create:configs
+To create a `config.yml` file and an encrypted `secrets.yml` file:
 
-If a config file already exists in any of the search path locations, it will yell at you.
+    bundle exec rake invar:init
+
+It will also output to terminal the generated master key used to decrypt the secrets file. Save this key in a password
+manager. If you do not want it to be displayed (eg. you're in public), you can pipe STDOUT to a file:
+
+    bundle exec rake invar:init > master_key
+
+Then handle the `master_key` file as needed.
+
+If either a pre-existing config or secrets file is found in any of the search path locations, it will yell at you with
+an `AmbiguousSourceError`.
 
 #### Edit Config File
 
-    bundle exec rake invar:edit:configs
+To open the file your system's default text editor (eg. nano):
 
-#### Create Secrets File
-
-To create the config file, run this in a terminal:
-
-    bundle exec rake invar:create:secrets
-
-It will print out the generated master key. Save it to a password manager.
-
-If you do not want it to be displayed (eg. you're in public), you can pipe it to a file:
-
-    bundle exec rake invar:create:secrets > master_key
-
-Then handle the `master_key` file as needed.
+    bundle exec rake invar:config
 
 #### Edit Secrets File
 
 To edit the secrets file, run this and provide the file's encryption key:
 
-    bundle exec rake invar:edit:secrets
+    bundle exec rake invar:secrets
 
-The file will be decrypted and opened in your default editor (eg. nano). Once you have exited the editor, it will be
-re-encrypted (remember to save, too!).
+The file will be decrypted and opened in your default editor like the config file. Once you have exited the editor, it
+will be re-encrypted. Remember to save your changes!
 
 ### Code
 
