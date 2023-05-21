@@ -200,7 +200,7 @@ module Invar
 
                write_encrypted_file(file_path, encryption_key, SECRETS_TEMPLATE)
 
-               warn "Created file #{ file_path }"
+               warn "Created file: #{ file_path }"
 
                warn SECRETS_INSTRUCTIONS
                warn 'Generated key is:'

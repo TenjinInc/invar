@@ -51,7 +51,7 @@ module Invar
          freeze
       end
 
-      # Locates the file with the given same. You may optionally provide an extension as a second argument.
+      # Locates the file with the given name. You may optionally provide an extension as a second argument.
       #
       # These are equivalent:
       #    find('config.yml')
