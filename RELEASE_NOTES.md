@@ -29,7 +29,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Minor Changes
 
-* none
+* Loosened file permission restrictions to allow group access as well
 
 ### Bugfixes
 

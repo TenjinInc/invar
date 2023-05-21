@@ -262,7 +262,7 @@ module Invar
                end
 
                it 'should NOT complain when keyfile has proper permissions' do
-                  [0o400, 0o600].each do |mode|
+                  [0o400, 0o600, 0o040, 0o060].each do |mode|
                      key_path.chmod(mode)
 
                      expect do
@@ -278,7 +278,7 @@ module Invar
                   # and redundant.
                   # Each is an octal mode triplet [User, Group, Others].
                   illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
-                                   0o000, 0o010, 0o020, 0o030, 0o040, 0o050, 0o060, 0o070, # group
+                                   0o000, 0o010, 0o020, 0o030, 0o050, 0o070, # group
                                    0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
                   illegal_modes.each do |mode|
                      it "should complain when keyfile has mode #{ format('%04o', mode) }" do

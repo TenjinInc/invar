@@ -42,8 +42,8 @@ module Invar
    # @see Reality#after_load
    # @see Reality#pretend
    class Reality
-      # Allowed permissions modes for lockfile. Readable or read-writable by the current user only
-      ALLOWED_LOCKFILE_MODES = [0o600, 0o400].freeze
+      # Allowed permissions modes for lockfile. Readable or read-writable by the user or group only
+      ALLOWED_LOCKFILE_MODES = [0o600, 0o400, 0o060, 0o040].freeze
 
       # Name of the default key file to be searched for within config directories
       DEFAULT_KEY_FILE_NAME = 'master_key'
