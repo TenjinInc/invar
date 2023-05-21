@@ -36,7 +36,9 @@ module Invar
          configs_dir.mkpath
 
          config_path.write '---'
+         config_path.chmod 0o600
          secrets_path.write lockbox.encrypt('---')
+         config_path.chmod 0o600
 
          key_path.write default_lockbox_key
          key_path.chmod 0o600
@@ -58,7 +60,9 @@ module Invar
             configs_dir.mkpath
 
             config_path.write clear_yaml
+            config_path.chmod 0o600
             secrets_path.write lockbox.encrypt clear_yaml
+            secrets_path.chmod 0o600
 
             key_file = configs_dir / 'master_key'
             key_file.write default_lockbox_key
@@ -90,7 +94,9 @@ module Invar
                configs_dir.mkpath
 
                config_path.write clear_yaml
+               config_path.chmod 0o600
                secrets_path.write lockbox.encrypt clear_yaml
+               secrets_path.chmod 0o600
 
                key_file = configs_dir / 'master_key'
                key_file.write default_lockbox_key
@@ -141,6 +147,14 @@ module Invar
          end
 
          context 'config file' do
+            it 'should verify the config file permissions' do
+               config_path.chmod(0o777)
+
+               expect do
+                  described_class.new namespace: name
+               end.to raise_error PrivateFile::FilePermissionsError
+            end
+
             context 'config file missing' do
                before :each do
                   config_path.delete
@@ -175,6 +189,18 @@ module Invar
          end
 
          context 'secrets file' do
+            before(:each) do
+               secrets_path.chmod(0o600)
+            end
+
+            it 'should verify the secrets file permissions' do
+               config_path.chmod(0o777)
+
+               expect do
+                  described_class.new namespace: name
+               end.to raise_error PrivateFile::FilePermissionsError
+            end
+
             context 'secrets file missing' do
                before(:each) do
                   secrets_path.delete
@@ -217,8 +243,10 @@ module Invar
                   config_path = configs_dir / 'config.yml'
                   config_path.dirname.mkpath
                   config_path.write clear_yaml
+                  config_path.chmod(0o600)
 
                   secrets_path.write lockbox.encrypt clear_yaml
+                  secrets_path.chmod(0o600)
                end
 
                it 'should NOT ask for it from STDIN' do
@@ -261,45 +289,16 @@ module Invar
                   end.to_not output.to_stderr
                end
 
-               it 'should NOT complain when keyfile has proper permissions' do
-                  [0o400, 0o600, 0o040, 0o060].each do |mode|
-                     key_path.chmod(mode)
+               it 'should verify keyfile permissions' do
+                  key_path.chmod(0o777)
 
-                     expect do
-                        described_class.new namespace: name, decryption_keyfile: key_file
-                     end.to_not raise_error
-                  end
-               end
-
-               context 'improper permissions' do
-                  # Generating each test instance separately to be very explicit about each one being tested.
-                  # Could have gotten fancy and calculate it, but tests should be clear.
-                  # Testing each mode segment individually and not testing the combos because that is a bit slow
-                  # and redundant.
-                  # Each is an octal mode triplet [User, Group, Others].
-                  illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
-                                   0o000, 0o010, 0o020, 0o030, 0o050, 0o070, # group
-                                   0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
-                  illegal_modes.each do |mode|
-                     it "should complain when keyfile has mode #{ format('%04o', mode) }" do
-                        key_path.chmod(mode)
-
-                        # '%04o' is string formatter speak for "4-digit octal"
-                        msg = format("File '%<path>s' has improper permissions (%<mode>04o).",
-                                     path: key_path, mode: mode)
-
-                        expect do
-                           described_class.new namespace: name, decryption_keyfile: key_file
-                        end.to raise_error SecretsFileDecryptionError,
-                                           include(msg).and(include('chmod'))
-                     end
-                  end
+                  expect do
+                     described_class.new namespace: name, decryption_keyfile: key_file
+                  end.to raise_error PrivateFile::FilePermissionsError
                end
             end
 
             context 'encryption key missing' do
-               let(:secrets_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name / 'secrets.yml' }
-
                before(:each) do
                   key_path.delete
                end
@@ -379,6 +378,7 @@ module Invar
 
             it 'should reraise decryption errors with additional information' do
                secrets_path.write 'badly-encrypted-content'
+               secrets_path.chmod(0o600)
 
                msg  = 'Failed to open'
                hint = 'Perhaps you used the wrong file decryption key?'
@@ -430,12 +430,14 @@ module Invar
                ---
                location: 'Moria'
             YML
+            configs_path.chmod 0o600
 
             secrets_path.dirname.mkpath
             secrets_path.write lockbox.encrypt <<~YML
                ---
                pass: 'mellon'
             YML
+            secrets_path.chmod 0o600
 
             key_path.write default_lockbox_key
             key_path.chmod 0o600

@@ -42,9 +42,6 @@ module Invar
    # @see Reality#after_load
    # @see Reality#pretend
    class Reality
-      # Allowed permissions modes for lockfile. Readable or read-writable by the user or group only
-      ALLOWED_LOCKFILE_MODES = [0o600, 0o400, 0o060, 0o040].freeze
-
       # Name of the default key file to be searched for within config directories
       DEFAULT_KEY_FILE_NAME = 'master_key'
 
@@ -174,24 +171,7 @@ module Invar
       end
 
       def read_keyfile(key_file)
-         verify_permissions! key_file
-
          key_file.read.strip
-      end
-
-      def verify_permissions!(file)
-         permissions_mask = 0o777 # only the lowest three digits are perms, so masking
-         stat             = file.stat
-         file_mode        = stat.mode & permissions_mask
-         # TODO: use stat.world_readable? etc instead
-         return if ALLOWED_LOCKFILE_MODES.include? file_mode
-
-         msg = format("File '%<path>s' has improper permissions (%<mode>04o). %<hint>s",
-                      path: file,
-                      mode: file_mode,
-                      hint: "Try: chmod 600 #{ file }")
-
-         raise SecretsFileDecryptionError, msg
       end
 
       # Validates a Reality object

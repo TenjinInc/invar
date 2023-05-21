@@ -422,6 +422,7 @@ module Invar
                      secrets_path.write lockbox.encrypt <<~YML
                         ---
                      YML
+                     secrets_path.chmod(0o600)
                   end
 
                   context 'Lockbox master key is defined' do

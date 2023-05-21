@@ -30,7 +30,9 @@ describe Invar do
       configs_dir.mkpath
 
       config_path.write '---'
+      config_path.chmod 0o600
       secrets_path.write lockbox.encrypt('---')
+      secrets_path.chmod 0o600
 
       key_path.write default_lockbox_key
       key_path.chmod 0o600

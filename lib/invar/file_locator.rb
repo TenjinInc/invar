@@ -2,6 +2,7 @@
 
 require 'invar/version'
 require 'invar/scope'
+require 'invar/private_file'
 
 require 'yaml'
 require 'lockbox'
@@ -58,7 +59,7 @@ module Invar
       #
       # @param [String] basename The file's basename
       # @param [String] ext the file extension, excluding the dot.
-      # @return [Pathname] the path of the located file
+      # @return [PrivateFile] the path of the located file
       # @raise [AmbiguousSourceError] if the file is found in multiple locations
       # @raise [FileNotFoundError] if the file cannot be found
       def find(basename, ext = nil)
@@ -72,7 +73,7 @@ module Invar
             raise AmbiguousSourceError, "#{ msg } #{ AmbiguousSourceError::HINT }"
          end
 
-         files.first || raise(FileNotFoundError, "Could not find #{ basename }")
+         PrivateFile.new(files.first || raise(FileNotFoundError, "Could not find #{ basename }"))
       end
 
       # Raised when the file cannot be found in any of the XDG search locations.

@@ -24,12 +24,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Major Changes
 
 * Simplified rake task syntax
-   * Added `rake invar:init`
-   * Now use `rake invar:config` and `rake invar:secrets`to edit 
+    * Added `rake invar:init`
+    * Now use `rake invar:config` and `rake invar:secrets`to edit
 
 ### Minor Changes
 
 * Loosened file permission restrictions to allow group access as well
+* Added file permissions checking to `config.yml` and `secrets.yml`
 
 ### Bugfixes
 
