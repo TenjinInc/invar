@@ -19,6 +19,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * none
 
+## [0.6.0] - 2023-05-21
+
+### Major Changes
+
+* Simplified rake task syntax
+   * Added `rake invar:init`
+   * Now use `rake invar:config` and `rake invar:secrets`to edit 
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
+* none
+
 ## [0.5.1] - 2022-12-10
 
 ### Major Changes
