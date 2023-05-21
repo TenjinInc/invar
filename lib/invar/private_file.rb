@@ -9,7 +9,7 @@ module Invar
    # Verifies a file is secure
    class PrivateFile #< SimpleDelegator
       extend Forwardable
-      def_delegators :@delegate_sd_obj, :stat, :to_s, :basename, :==
+      def_delegators :@delegate_sd_obj, :stat, :to_s, :basename, :==, :chmod
 
       # Allowed permissions modes for lockfile. Readable or read-writable by the user or group only
       ALLOWED_MODES = [0o600, 0o400, 0o060, 0o040].freeze

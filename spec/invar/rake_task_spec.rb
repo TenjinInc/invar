@@ -70,12 +70,17 @@ module Invar
                      task.invoke
 
                      expect(config_path).to exist
+
+                     file_mode = config_path.stat.mode & 0o777
+                     expect(file_mode).to eq 0o600
                   end
 
                   it 'should create a secrets file in the XDG_CONFIG_HOME path' do
                      task.invoke
 
                      expect(secrets_path).to exist
+                     file_mode = secrets_path.stat.mode & 0o777
+                     expect(file_mode).to eq 0o600
                   end
 
                   it 'should only init config when specified' do

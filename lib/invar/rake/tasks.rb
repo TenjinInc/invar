@@ -157,6 +157,7 @@ module Invar
 
                config_dir.mkpath
                file_path.write CONFIG_TEMPLATE
+               file_path.chmod 0o600
 
                warn "Created file: #{ file_path }"
             end
@@ -239,6 +240,7 @@ module Invar
                config_dir.mkpath
                # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
                File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
+               file_path.chmod 0o600
             end
 
             def edit_encrypted_file(file_path)
