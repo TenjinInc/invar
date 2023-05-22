@@ -11,8 +11,13 @@ module Invar
       extend Forwardable
       def_delegators :@delegate_sd_obj, :stat, :to_s, :basename, :==, :chmod
 
+      ALLOWED_USER_MODES  = [0o600, 0o400].freeze
+      ALLOWED_GROUP_MODES = [0o060, 0o040, 0o000].freeze
+
       # Allowed permissions modes for lockfile. Readable or read-writable by the user or group only
-      ALLOWED_MODES = [0o600, 0o400, 0o060, 0o040].freeze
+      ALLOWED_MODES = ALLOWED_USER_MODES.product(ALLOWED_GROUP_MODES).collect do |u, g|
+         u | g # bitwise OR
+      end.freeze
 
       def initialize(file_path)
          @delegate_sd_obj = file_path

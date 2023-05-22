@@ -8,6 +8,35 @@ module Invar
       #
       # end
 
+      describe 'ALLOWED_MODES' do
+         let(:user_mask) { 0o700 }
+         let(:group_mask) { 0o070 }
+
+         it 'should allow user read only' do
+            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
+
+            expect(user_modes).to eq([0o600, 0o400])
+         end
+
+         it 'should allow user read write' do
+            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
+
+            expect(user_modes).to eq([0o600, 0o400])
+         end
+
+         it 'should allow group read only' do
+            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
+
+            expect(user_modes).to eq([0o060, 0o040, 0o000])
+         end
+
+         it 'should allow group read write' do
+            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
+
+            expect(user_modes).to eq([0o060, 0o040, 0o000])
+         end
+      end
+
       describe '#read' do
          let(:file_path) { Pathname.new('invar_test_file') }
          let(:private_file) { described_class.new file_path }
@@ -18,6 +47,13 @@ module Invar
          end
 
          it 'should NOT complain when the file has proper permissions' do
+            user_modes  = [0o600, 0o400]
+            group_modes = [0o060, 0o040, 0o000]
+
+            modes = user_modes.product(group_modes).collect do |u, g|
+               u | g
+            end
+
             PrivateFile::ALLOWED_MODES.each do |mode|
                file_path.chmod(mode)
 
@@ -34,14 +70,9 @@ module Invar
          end
 
          context 'improper permissions' do
-            # Generating each test instance separately to be very explicit about each one being tested.
-            # Could have gotten fancy and calculate it, but tests should be clear.
-            # Testing each mode segment individually and not testing the combos because that is a bit slow
-            # and redundant.
             # Each is an octal mode triplet [User, Group, Others].
-            illegal_modes = [0o000, 0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, # world / others
-                             0o000, 0o010, 0o020, 0o030, 0o050, 0o070, # group
-                             0o000, 0o100, 0o200, 0o300, 0o500, 0o700] # user
+            illegal_modes = (0o000..0o777).to_a - PrivateFile::ALLOWED_MODES
+
             illegal_modes.each do |mode|
                it "should complain when file has mode #{ format('%04o', mode) }" do
                   file_path.chmod(mode)
