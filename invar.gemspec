@@ -31,11 +31,4 @@ Gem::Specification.new do |spec|
 
    spec.add_dependency 'dry-schema', '>= 1.0'
    spec.add_dependency 'lockbox', '>= 1.0'
-
-   spec.add_development_dependency 'bundler', '~> 2.3'
-   spec.add_development_dependency 'fakefs', '~> 1.9'
-   spec.add_development_dependency 'rake', '~> 13.0'
-   spec.add_development_dependency 'rspec', '~> 3.12'
-   spec.add_development_dependency 'simplecov', '~> 0.21'
-   spec.add_development_dependency 'yard', '~> 0.9'
 end

@@ -7,7 +7,7 @@ require 'delegate'
 
 module Invar
    # Verifies a file is secure
-   class PrivateFile #< SimpleDelegator
+   class PrivateFile
       extend Forwardable
       def_delegators :@delegate_sd_obj, :stat, :to_s, :basename, :==, :chmod
 

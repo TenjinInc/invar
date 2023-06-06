@@ -44,7 +44,7 @@ describe Invar do
 
    describe '.new' do
       it 'should alias Invar::Invar.new' do
-         expect(Invar.new(namespace: name)).to be_a ::Invar::Reality
+         expect(Invar.new(namespace: name)).to be_a Invar::Reality
       end
    end
 
@@ -52,7 +52,7 @@ describe Invar do
       it 'should run the handler after loading an instance' do
          has_run = false
 
-         ::Invar.after_load do
+         Invar.after_load do
             has_run = true
          end
 
