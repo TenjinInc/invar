@@ -31,7 +31,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Bugfixes
 
-* Fixed minor logic error in permissions checking, improved testing 
+* Fixed minor logic error in permissions checking, improved testing
 
 ## [0.6.0] - 2023-05-21
 
