@@ -72,14 +72,14 @@ module Invar
             @configs = Scope.new(load_configs(locator))
          rescue FileLocator::FileNotFoundError
             raise MissingConfigFileError,
-                  "No config file found. Create config.yml in one of these locations: #{ search_paths }"
+                  "No Invar config file found. Create config.yml in one of these locations: #{ search_paths }"
          end
 
          begin
             @secrets = Scope.new(load_secrets(locator, decryption_keyfile || DEFAULT_KEY_FILE_NAME))
          rescue FileLocator::FileNotFoundError
             raise MissingSecretsFileError,
-                  "No secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
+                  "No Invar secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
          end
 
          freeze

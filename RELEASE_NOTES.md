@@ -13,7 +13,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Minor Changes
 
-* none
+* Tweaked file missing error messages
 
 ### Bugfixes
 

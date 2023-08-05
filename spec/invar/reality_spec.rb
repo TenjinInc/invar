@@ -163,7 +163,7 @@ module Invar
                it 'should explode' do
                   expect do
                      described_class.new namespace: name
-                  end.to raise_error MissingConfigFileError, start_with('No config file found.')
+                  end.to raise_error MissingConfigFileError, start_with('No Invar config file found.')
                end
 
                it 'should hint at a solution' do
@@ -209,7 +209,7 @@ module Invar
                it 'should explode' do
                   expect do
                      described_class.new namespace: name
-                  end.to raise_error MissingSecretsFileError, start_with('No secrets file found.')
+                  end.to raise_error MissingSecretsFileError, start_with('No Invar secrets file found.')
                end
 
                it 'should hint at a solution' do
