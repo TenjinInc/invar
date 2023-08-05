@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'invar/version'
-require 'invar/reality'
+require_relative 'invar/version'
+require_relative 'invar/reality'
 
 # Invar is a Ruby Gem that provides a single source of truth for application configuration, secrets, and environment
 # variables.
