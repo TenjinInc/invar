@@ -560,6 +560,28 @@ module Invar
                      expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
                   end
 
+                  it 'should not try to change the permissions' do
+                     custom_permissions = 0o640
+                     secrets_path.chmod custom_permissions
+
+                     Lockbox.master_key = default_lockbox_key
+
+                     new_contents = <<~YML
+                        ---
+                        password: mellon
+                     YML
+                     tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
+                     allow(Tempfile).to receive(:create).and_yield tmpfile
+
+                     task.invoke
+
+                     lockbox = Lockbox.new(key: default_lockbox_key)
+
+                     expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
+                     mode = secrets_path.lstat.mode & PrivateFile::PERMISSIONS_MASK
+                     expect(mode).to eq custom_permissions
+                  end
+
                   it 'should state the file saved' do
                      Lockbox.master_key = default_lockbox_key
 

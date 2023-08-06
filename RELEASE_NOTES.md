@@ -19,7 +19,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Bugfixes
 
-* none
+* No longer attempts to set secrets file permissions on every edit
 
 ## [0.6.1] - 2023-05-22
 

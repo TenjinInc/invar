@@ -199,7 +199,10 @@ module Invar
 
                encryption_key = Lockbox.generate_key
 
-               write_encrypted_file(file_path, encryption_key, SECRETS_TEMPLATE)
+               write_encrypted_file(file_path,
+                                    encryption_key: encryption_key,
+                                    content:        SECRETS_TEMPLATE,
+                                    permissions:    PrivateFile::DEFAULT_PERMISSIONS)
 
                warn "Created file: #{ file_path }"
 
@@ -232,7 +235,7 @@ module Invar
                'secrets.yml'
             end
 
-            def write_encrypted_file(file_path, encryption_key, content)
+            def write_encrypted_file(file_path, encryption_key:, content:, permissions: nil)
                lockbox = Lockbox.new(key: encryption_key)
 
                encrypted_data = lockbox.encrypt(content)
@@ -240,7 +243,7 @@ module Invar
                config_dir.mkpath
                # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
                File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
-               file_path.chmod 0o600
+               file_path.chmod permissions if permissions
             end
 
             def edit_encrypted_file(file_path)
@@ -257,7 +260,7 @@ module Invar
                   tmp_file.read
                end
 
-               write_encrypted_file(file_path, encryption_key, file_str)
+               write_encrypted_file(file_path, encryption_key: encryption_key, content: file_str)
             end
 
             def determine_key(file_path)
