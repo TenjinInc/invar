@@ -51,6 +51,14 @@ describe 'Invar test extension' do
                end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::HOOK_MSG
             end
          end
+
+         describe '.clear_hooks' do
+            it 'should explode' do
+               expect do
+                  Invar.clear_hooks
+               end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::HOOK_MSG
+            end
+         end
       end
 
       describe Invar::Scope do
@@ -84,6 +92,38 @@ describe 'Invar test extension' do
       end
 
       describe Invar do
+         describe '.after_load' do
+            before do
+               Invar.clear_hooks
+            end
+
+            it 'should store the handler block' do
+               demo_block = proc {}
+               Invar.after_load &demo_block
+
+               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__.size).to eq 1
+               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to include demo_block
+            end
+
+            it 'should store multiple handler blocks' do
+               demo_block1 = proc {}
+               demo_block2 = proc {}
+               Invar.after_load &demo_block1
+               Invar.after_load &demo_block2
+
+               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to eq [demo_block1, demo_block2]
+            end
+         end
+
+         describe '.clear_hooks' do
+            it 'should reset the after_load hook' do
+               Invar.clear_hooks
+               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to be_empty
+            end
+         end
+      end
+
+      describe Invar::Reality do
          let(:default_lockbox_key) { '0' * 64 }
          let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
 
@@ -119,23 +159,16 @@ describe 'Invar test extension' do
             key_path.chmod 0o600
          end
 
-         describe '.after_load' do
-            # TODO: test for registering the hook
-            # TOOD: test for registering multiple hooks
-            # TODO: add ability to unset/clear hook(s)
+         it 'should run the handler after loading an instance' do
+            has_run = false
 
-            # TODO: move this to a Reality mixin
-            it 'should run the handler after loading an instance' do
-               has_run = false
-
-               Invar.after_load do
-                  has_run = true
-               end
-
-               expect(has_run).to be false
-               described_class.new namespace: name
-               expect(has_run).to be true
+            Invar.after_load do
+               has_run = true
             end
+
+            expect(has_run).to be false
+            described_class.new namespace: name
+            expect(has_run).to be true
          end
       end
 

@@ -10,19 +10,24 @@ module Invar
    module TestExtension
       module RealityMethods
          class << self
-            attr_accessor :__override_block__
+            attr_accessor :__after_load_hooks__
+            RealityMethods.__after_load_hooks__ = []
          end
 
          def initialize(**)
             super
 
             # instance_eval(&self.class.__override_block__)
-            RealityMethods.__override_block__&.call(self)
+            RealityMethods.__after_load_hooks__.each { |hook| hook.call(self) }
          end
       end
 
       # Adds methods to the main Invar module itself for a global-access hook to be used in application init phase.
       module LoadHook
+         def clear_hooks
+            RealityMethods.__after_load_hooks__.clear
+         end
+
          # Block that will be run after loading from config files.
          #
          # It is intended to allow test suites to tweak configurations without having to duplicate the entire config file.
@@ -30,7 +35,7 @@ module Invar
          # @yieldparam the configs from the Invar
          # @return [void]
          def after_load(&block)
-            RealityMethods.__override_block__ = block
+            RealityMethods.__after_load_hooks__.push(block)
          end
       end
 

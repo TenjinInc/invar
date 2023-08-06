@@ -15,6 +15,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Tweaked file missing error messages
 * Extracted testing helper features into a separate module
+* Added support for multiple after_load hooks
 
 ### Bugfixes
 

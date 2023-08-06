@@ -42,7 +42,7 @@ module Invar
       HINT
 
       PRETEND_MSG = "Method 'Invar::Scope#pretend' is defined in the testing extension. #{ HINT }"
-      HOOK_MSG    = "Method 'Invar.after_load' is defined in the testing extension. #{ HINT }"
+      HOOK_MSG    = "Methods 'Invar.after_load and clear_hooks' are defined in the testing extension. #{ HINT }"
    end
 
    # Raised when schema validation fails

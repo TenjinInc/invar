@@ -16,7 +16,7 @@ module Invar
 
    class << self
       def method_missing(meth)
-         if meth == :after_load
+         if [:after_load, :clear_hooks].include? meth
             raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::HOOK_MSG
          else
             super
