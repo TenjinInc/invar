@@ -81,44 +81,6 @@ module Invar
          end
       end
 
-      describe '#pretend' do
-         let(:data) do
-            {
-                  event: 'Birthday',
-                  host:  'Bilbo Baggins'
-            }
-         end
-         let(:scope) { described_class.new data }
-
-         it 'should explode when called outside of a pretend' do
-            expect do
-               scope.pretend event: 'Disappearance'
-            end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::MSG
-         end
-
-         it 'should override a data field' do
-            require 'invar/test'
-            scope.pretend(event: 'Disappearance')
-
-            expect(scope / :event).to eq 'Disappearance'
-         end
-
-         it 'should override multiple data fields' do
-            require 'invar/test'
-            scope.pretend(event: 'Fireworks', host: 'Gandalf')
-
-            expect(scope / :event).to eq 'Fireworks'
-            expect(scope / :host).to eq 'Gandalf'
-         end
-
-         it 'should convert the key to a symbol' do
-            require 'invar/test'
-            scope.pretend('event' => 'Fireworks')
-
-            expect(scope / :event).to eq 'Fireworks'
-         end
-      end
-
       describe '#to_h' do
          let(:data) do
             {
@@ -134,23 +96,6 @@ module Invar
 
          it 'should include its keys and values' do
             expect(scope.to_h).to eq(data)
-         end
-
-         it 'should use pretend values instead of regular ones' do
-            require 'invar/test'
-            scope.pretend(event: 'Disappearance')
-
-            expect(scope.to_h).to include(event: 'Disappearance')
-         end
-
-         it 'should convert subscopes to hash' do
-            require 'invar/test'
-            scope.pretend(event: 'Disappearance')
-
-            expect(scope.to_h).to include(entertainment: {
-                  provider: 'Gandalf',
-                  show:     'Fireworks'
-            })
          end
       end
    end

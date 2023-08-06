@@ -48,17 +48,9 @@ describe Invar do
       end
    end
 
-   describe '.after_load' do
-      it 'should run the handler after loading an instance' do
-         has_run = false
-
-         Invar.after_load do
-            has_run = true
-         end
-
-         expect(has_run).to be false
-         described_class.new namespace: name
-         expect(has_run).to be true
+   describe '.method_missing' do
+      it 'should call super when not a testing method' do
+         expect { Invar.asdf }.to raise_error NoMethodError
       end
    end
 end

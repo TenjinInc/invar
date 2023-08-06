@@ -7,7 +7,6 @@ module Invar
          @data = convert(data)
 
          @data.freeze
-         @data_override = {}
          freeze
       end
 
@@ -18,23 +17,27 @@ module Invar
       # @see #override
       def fetch(key)
          key = key.downcase.to_sym
-         @data_override.fetch(key, @data.fetch(key))
+         @data.fetch key
       rescue KeyError => e
-         raise KeyError, "#{ e.message }. Known keys are #{ @data.keys.sort.collect { |k| ":#{ k }" }.join(', ') }"
+         raise KeyError, "#{ e.message }. Known keys are #{ known_keys }"
       end
 
       alias / fetch
       alias [] fetch
 
-      def pretend(**)
-         raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::MSG
+      def method_missing(symbol, *args)
+         if symbol == :pretend
+            raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG
+         else
+            super
+         end
       end
 
       # Returns a hash representation of this scope and subscopes.
       #
       # @return [Hash] a hash representation of this scope
       def to_h
-         @data.merge(@data_override).to_h.transform_values do |value|
+         @data.to_h.transform_values do |value|
             case value
             when Scope
                value.to_h
@@ -50,11 +53,15 @@ module Invar
 
       private
 
+      def known_keys
+         @data.keys.sort.collect { |k| ":#{ k }" }.join(', ')
+      end
+
       def convert(data)
          (data || {}).dup.each_with_object({}) do |pair, agg|
             key, value = pair
 
-            agg[key] = value.is_a?(Hash) ? Scope.new(value) : value
+            agg[key.to_s.downcase.to_sym] = value.is_a?(Hash) ? Scope.new(value) : value
          end
       end
    end
