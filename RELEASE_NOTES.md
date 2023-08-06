@@ -14,6 +14,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Minor Changes
 
 * Tweaked file missing error messages
+* Extracted testing helper features into a separate module
 
 ### Bugfixes
 
