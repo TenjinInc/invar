@@ -26,11 +26,9 @@ module Invar
       alias [] fetch
 
       def method_missing(symbol, *args)
-         if symbol == :pretend
-            raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG
-         else
-            super
-         end
+         raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG if symbol == :pretend
+
+         super
       end
 
       # Returns a hash representation of this scope and subscopes.

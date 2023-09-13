@@ -47,13 +47,6 @@ module Invar
          end
 
          it 'should NOT complain when the file has proper permissions' do
-            user_modes  = [0o600, 0o400]
-            group_modes = [0o060, 0o040, 0o000]
-
-            modes = user_modes.product(group_modes).collect do |u, g|
-               u | g
-            end
-
             PrivateFile::ALLOWED_MODES.each do |mode|
                file_path.chmod(mode)
 
@@ -80,7 +73,7 @@ module Invar
                   msg = "File '#{ file_path }' has improper permissions"
 
                   # '%04o' is string formatter speak for "4-digit octal"
-                  mode_msg = format("%<mode>04o", mode: mode)
+                  mode_msg = format('%<mode>04o', mode: mode)
 
                   expect do
                      private_file.read

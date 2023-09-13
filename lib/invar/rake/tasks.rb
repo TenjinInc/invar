@@ -30,8 +30,8 @@ module Invar
          #
          # @param (see #define)
          # @see Tasks#define
-         def self.define(**args, &block)
-            new.define(**args, &block)
+         def self.define(...)
+            new.define(...)
          end
 
          # Defines helpful Rake tasks for the given namespace.

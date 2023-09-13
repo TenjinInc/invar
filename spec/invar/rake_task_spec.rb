@@ -160,7 +160,8 @@ module Invar
                      end
 
                      it 'should suggest using secrets parameter' do
-                        suggestion = 'Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]'
+                        cmd        = 'bundle exec rake tasks invar:init[secrets]'
+                        suggestion = "Run this to init only the secrets file: #{ cmd }"
                         expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
                      end
                   end
@@ -274,7 +275,8 @@ module Invar
                      end
 
                      it 'should suggest using secrets parameter' do
-                        suggestion = 'Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]'
+                        cmd        = 'bundle exec rake tasks invar:init[secrets]'
+                        suggestion = "Run this to init only the secrets file: #{ cmd }"
                         expect { task.invoke }.to output(include(suggestion)).to_stderr.and(raise_error(SystemExit))
                      end
                   end
@@ -320,7 +322,8 @@ module Invar
 
                   it 'should edit the config file in the XDG_CONFIG_HOME path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
+                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask)
+                           .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
                   end
@@ -331,7 +334,8 @@ module Invar
                      xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
                      xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-                     search_path = [Pathname.new(xdg_home).expand_path / name].concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+                     search_path = [Pathname.new(xdg_home).expand_path / name]
+                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
 
                      msg = <<~MSG
                         Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
@@ -370,7 +374,8 @@ module Invar
 
                   it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask).to receive(:system).with('editor', config_path.to_s, exception: true)
+                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask)
+                           .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
                   end
@@ -508,7 +513,8 @@ module Invar
                      xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
                      xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-                     search_path = [Pathname.new(xdg_home).expand_path / name].concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+                     search_path = [Pathname.new(xdg_home).expand_path / name]
+                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
@@ -538,7 +544,8 @@ module Invar
                      allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::SecretTask).to receive(:system).with('editor', '/tmp/whatever', exception: true)
+                     expect_any_instance_of(Invar::Rake::Tasks::SecretTask)
+                           .to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
                      task.invoke
                   end

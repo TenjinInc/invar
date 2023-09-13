@@ -365,7 +365,8 @@ module Invar
                      msg = "Could not find file '#{ Reality::DEFAULT_KEY_FILE_NAME }'."
 
                      # TODO: Would be better to control the XDG env vars here once something like Climate Control is added
-                     search_paths = ([XDG::Defaults::CONFIG_HOME] + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
+                     search_paths = [XDG::Defaults::CONFIG_HOME]
+                     search_paths = (search_paths + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
                         Pathname.new(p).expand_path / name
                      end.join(', ')
 

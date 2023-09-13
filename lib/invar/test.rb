@@ -1,16 +1,19 @@
 # frozen_string_literal: true
 
-# Specifically not calling require 'invar' here to force applications to need to include it themselves,
-# preventing the situation where test suites include application dependencies for them and breaking when
+# Specifically not calling require 'invar' in this file to force applications to need to include it themselves,
+# avoiding the situation where test suites include application dependencies for them and breaking when
 # the app is run without the test suite
 
+# :nodoc:
 module Invar
    # Namespace module containing mixins for parts of the main gem to enable modifications and data control
    # in automated testing, while remaining immutable in the main gem and real runtime usage.
    module TestExtension
+      # Methods to extend the Reality class
       module RealityMethods
          class << self
             attr_accessor :__after_load_hooks__
+
             RealityMethods.__after_load_hooks__ = []
          end
 

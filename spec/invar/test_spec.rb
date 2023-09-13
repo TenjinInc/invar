@@ -48,7 +48,7 @@ describe 'Invar test extension' do
                   Invar.after_load do |_|
                      # etc
                   end
-               end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::HOOK_MSG
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
             end
          end
 
@@ -56,7 +56,7 @@ describe 'Invar test extension' do
             it 'should explode' do
                expect do
                   Invar.clear_hooks
-               end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::HOOK_MSG
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
             end
          end
       end
@@ -74,7 +74,7 @@ describe 'Invar test extension' do
             it 'should explode when called outside of a pretend' do
                expect do
                   scope.pretend event: 'Disappearance'
-               end.to raise_error ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::PRETEND_MSG
             end
 
             it 'should raise error as normal for other methods' do
@@ -268,14 +268,16 @@ describe 'Invar test extension' do
                scope.pretend(event: 'Disappearance')
                scope[:entertainment].pretend(show: 'Magic')
 
-               expect(scope.to_h).to eq({
-                                              event:         'Disappearance',
-                                              host:          'Bilbo Baggins',
-                                              entertainment: {
-                                                    provider: 'Gandalf',
-                                                    show:     'Magic'
-                                              }
-                                        })
+               expected = {
+                     event:         'Disappearance',
+                     host:          'Bilbo Baggins',
+                     entertainment: {
+                           provider: 'Gandalf',
+                           show:     'Magic'
+                     }
+               }
+
+               expect(scope.to_h).to eq expected
             end
          end
       end

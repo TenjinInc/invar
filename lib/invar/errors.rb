@@ -1,5 +1,7 @@
-module Invar
+# frozen_string_literal: true
 
+# :nodoc:
+module Invar
    # Raised when no config file can be found within the search paths.
    class MissingConfigFileError < RuntimeError
    end
@@ -41,8 +43,8 @@ module Invar
             require 'invar/test'
       HINT
 
-      PRETEND_MSG = "Method 'Invar::Scope#pretend' is defined in the testing extension. #{ HINT }"
-      HOOK_MSG    = "Methods 'Invar.after_load and clear_hooks' are defined in the testing extension. #{ HINT }"
+      PRETEND_MSG = "Method 'Invar::Scope#pretend' is defined in the testing extension. #{ HINT }".freeze
+      HOOK_MSG    = "Methods 'Invar.after_load and clear_hooks' are defined in the testing extension. #{ HINT }".freeze
    end
 
    # Raised when schema validation fails

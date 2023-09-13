@@ -78,8 +78,9 @@ module Invar
          begin
             @secrets = Scope.new(load_secrets(locator, decryption_keyfile || DEFAULT_KEY_FILE_NAME))
          rescue FileLocator::FileNotFoundError
+            hint = "Create encrypted secrets.yml in one of these locations: #{ search_paths }"
             raise MissingSecretsFileError,
-                  "No Invar secrets file found. Create encrypted secrets.yml in one of these locations: #{ search_paths }"
+                  "No Invar secrets file found. #{ hint }"
          end
 
          freeze
