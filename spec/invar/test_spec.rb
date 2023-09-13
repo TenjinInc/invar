@@ -99,7 +99,7 @@ describe 'Invar test extension' do
 
             it 'should store the handler block' do
                demo_block = proc {}
-               Invar.after_load &demo_block
+               Invar.after_load(&demo_block)
 
                expect(Invar::TestExtension::RealityMethods.__after_load_hooks__.size).to eq 1
                expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to include demo_block
@@ -108,8 +108,8 @@ describe 'Invar test extension' do
             it 'should store multiple handler blocks' do
                demo_block1 = proc {}
                demo_block2 = proc {}
-               Invar.after_load &demo_block1
-               Invar.after_load &demo_block2
+               Invar.after_load(&demo_block1)
+               Invar.after_load(&demo_block2)
 
                expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to eq [demo_block1, demo_block2]
             end

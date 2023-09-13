@@ -13,6 +13,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Minor Changes
 
+* none
+
+### Bugfixes
+
+* none
+
+## [0.8.0] - 2023-09-13
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
+* Increased minimum Ruby to 3.1
+
+### Bugfixes
+
+* none
+
+## [0.7.0] - 2023-08-06
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
 * Tweaked file missing error messages
 * Extracted testing helper features into a separate module
 * Added support for multiple after_load hooks
