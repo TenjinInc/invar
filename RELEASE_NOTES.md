@@ -13,7 +13,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Minor Changes
 
-* none
+* Added Rake task for secrets file key rotation
 
 ### Bugfixes
 

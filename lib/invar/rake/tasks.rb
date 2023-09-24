@@ -195,7 +195,7 @@ module Invar
          class SecretsFileHandler < NamespacedFileTask
             # Instructions hint for how to handle secret keys.
             SECRETS_INSTRUCTIONS = <<~INST
-               Save this key to a secure password manager. You will need it to edit the secrets.yml file.
+               Generated key. Save this key to a secure password manager, you will need it to edit the secrets.yml file:
             INST
 
             SWAP_EXT = 'tmp'
@@ -211,10 +211,7 @@ module Invar
                                     content:        content,
                                     permissions:    PrivateFile::DEFAULT_PERMISSIONS)
 
-               warn "Saved file: #{ file_path }"
-
                warn SECRETS_INSTRUCTIONS
-               warn 'Generated key is:'
                puts encryption_key
             end
 
@@ -274,6 +271,8 @@ module Invar
                # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
                File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
                file_path.chmod permissions if permissions
+
+               warn "Saved file: #{ file_path }"
             end
 
             def edit_encrypted_file(file_path, content: nil)
