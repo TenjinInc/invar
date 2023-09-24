@@ -26,7 +26,8 @@ variables have some downsides:
 * Cannot be easily checked against a schema for early error detection
 * Ruby's core ENV does not accept symbols as keys (a minor nuisance, but it counts)
 
-> **Fun Fact:** Invar is named for an [alloy used in clockmaking](https://en.wikipedia.org/wiki/Invar) - it's short for "**invar**iable".
+> **Fun Fact:** Invar is named for an [alloy used in clockmaking](https://en.wikipedia.org/wiki/Invar) - it's short
+> for "**invar**iable".
 
 ### Features
 
@@ -223,7 +224,23 @@ To edit the secrets file, run this and provide the file's encryption key:
     bundle exec rake invar:secrets
 
 The file will be decrypted and opened in your default editor like the config file. Once you have exited the editor, it
-will be re-encrypted. Remember to save your changes!
+will be re-encrypted. **Remember to save your changes!**
+
+> **Automation tip** you can set the current encryption key in the `LOCKBOX_MASTER_KEY` environment variable:
+>
+>     LOCKBOX_MASTER_KEY=sooper_sekret_key_here bundle exec rake invar:secrets
+
+#### Rotating the Secrets File Encryption Key
+
+To re-encrypt the secrets file, run this and provide the file's current encryption key:
+
+    bundle exec rake invar:rotate
+
+A new encryption key will be generated just like using `invar:init`.
+
+> **Automation tip** you can set the current encryption key in the `LOCKBOX_MASTER_KEY` environment variable:
+>
+>     LOCKBOX_MASTER_KEY=sooper_sekret_key_here bundle exec rake invar:rotate
 
 ### Code
 

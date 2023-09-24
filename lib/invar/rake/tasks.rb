@@ -51,7 +51,7 @@ module Invar
                define_init_task(app_namespace)
 
                define_config_task(app_namespace)
-               define_secrets_task(app_namespace)
+               define_secrets_tasks(app_namespace)
 
                define_info_tasks(app_namespace)
             end
@@ -62,8 +62,8 @@ module Invar
             task :init, [:mode] do |_task, args|
                mode = args.mode
 
-               config  = ::Invar::Rake::Tasks::ConfigTask.new(app_namespace)
-               secrets = ::Invar::Rake::Tasks::SecretTask.new(app_namespace)
+               config  = ::Invar::Rake::Tasks::ConfigFileHandler.new(app_namespace)
+               secrets = ::Invar::Rake::Tasks::SecretsFileHandler.new(app_namespace)
 
                case mode
                when 'config'
@@ -84,27 +84,32 @@ module Invar
          def define_config_task(app_namespace)
             desc 'Edit the config in your default editor'
             task :configs do
-               ::Invar::Rake::Tasks::ConfigTask.new(app_namespace).edit
+               ::Invar::Rake::Tasks::ConfigFileHandler.new(app_namespace).edit
             end
 
             # alias
             task config: ['configs']
          end
 
-         def define_secrets_task(app_namespace)
+         def define_secrets_tasks(app_namespace)
             desc 'Edit the encrypted secrets file in your default editor'
             task :secrets do
-               ::Invar::Rake::Tasks::SecretTask.new(app_namespace).edit
+               ::Invar::Rake::Tasks::SecretsFileHandler.new(app_namespace).edit
             end
 
             # alias
             task secret: ['secrets']
+
+            desc 'Encrypt the secrets file with a new generated key'
+            task :rotate do
+               ::Invar::Rake::Tasks::SecretsFileHandler.new(app_namespace).rotate
+            end
          end
 
          def define_info_tasks(app_namespace)
             desc 'Show directories to be searched for the given namespace'
             task :paths do
-               ::Invar::Rake::Tasks::StateTask.new(app_namespace).show_paths
+               ::Invar::Rake::Tasks::StatusHandler.new(app_namespace).show_paths
             end
          end
 
@@ -133,7 +138,7 @@ module Invar
          end
 
          # Tasks that use a namespace for file searching
-         class NamespacedTask
+         class NamespacedFileTask
             def initialize(namespace)
                @locator = FileLocator.new(namespace)
             end
@@ -150,7 +155,7 @@ module Invar
          end
 
          # Configuration file actions.
-         class ConfigTask < NamespacedTask
+         class ConfigFileHandler < NamespacedFileTask
             # Creates a config file in the appropriate location
             def create
                raise 'File already exists' if file_path.exist?
@@ -187,24 +192,26 @@ module Invar
          end
 
          # Secrets file actions.
-         class SecretTask < NamespacedTask
+         class SecretsFileHandler < NamespacedFileTask
             # Instructions hint for how to handle secret keys.
             SECRETS_INSTRUCTIONS = <<~INST
                Save this key to a secure password manager. You will need it to edit the secrets.yml file.
             INST
 
+            SWAP_EXT = 'tmp'
+
             # Creates a new encrypted secrets file and prints the generated encryption key to STDOUT
-            def create
+            def create(content: SECRETS_TEMPLATE)
                raise 'File already exists' if file_path.exist?
 
                encryption_key = Lockbox.generate_key
 
                write_encrypted_file(file_path,
                                     encryption_key: encryption_key,
-                                    content:        SECRETS_TEMPLATE,
+                                    content:        content,
                                     permissions:    PrivateFile::DEFAULT_PERMISSIONS)
 
-               warn "Created file: #{ file_path }"
+               warn "Saved file: #{ file_path }"
 
                warn SECRETS_INSTRUCTIONS
                warn 'Generated key is:'
@@ -214,25 +221,48 @@ module Invar
             # Opens an editor for the decrypted contents of the secrets file. After closing the editor, the file will be
             # updated with the new encrypted contents.
             def edit
-               secrets_file = begin
-                                 @locator.find('secrets.yml')
-                              rescue ::Invar::FileLocator::FileNotFoundError => e
-                                 warn <<~ERR
-                                    Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
-                                    #{ CREATE_SUGGESTION }
-                                 ERR
-                                 exit 1
-                              end
-
                edit_encrypted_file(secrets_file)
 
                warn "File saved to #{ secrets_file }"
             end
 
+            def rotate
+               file_path = secrets_file
+
+               decrypted = read_encrypted_file(file_path, encryption_key: determine_key(file_path))
+
+               # # TODO: use rename instead when FakeFS removed
+               swap_file = Pathname.new("#{ File.dirname(file_path.to_s) }/#{ file_path.basename }.#{ SWAP_EXT }")
+               # file_path.rename swap_file
+               File.rename(file_path.to_s, swap_file.to_s)
+
+               begin
+                  create(content: decrypted)
+                  swap_file.delete
+               rescue StandardError
+                  File.rename(swap_file.to_s, file_path.to_s)
+               end
+            end
+
             private
+
+            def secrets_file
+               @locator.find 'secrets.yml'
+            rescue ::Invar::FileLocator::FileNotFoundError => e
+               warn <<~ERR
+                  Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
+                  #{ CREATE_SUGGESTION }
+               ERR
+               exit 1
+            end
 
             def filename
                'secrets.yml'
+            end
+
+            def read_encrypted_file(file_path, encryption_key:)
+               lockbox = build_lockbox(encryption_key)
+               lockbox.decrypt(file_path.binread)
             end
 
             def write_encrypted_file(file_path, encryption_key:, content:, permissions: nil)
@@ -246,21 +276,23 @@ module Invar
                file_path.chmod permissions if permissions
             end
 
-            def edit_encrypted_file(file_path)
+            def edit_encrypted_file(file_path, content: nil)
                encryption_key = determine_key(file_path)
 
-               lockbox = build_lockbox(encryption_key)
+               content_str = content || invoke_editor(file_path, encryption_key: encryption_key)
 
-               file_str = Tempfile.create(file_path.basename.to_s) do |tmp_file|
-                  decrypted = lockbox.decrypt(file_path.binread)
+               write_encrypted_file(file_path, encryption_key: encryption_key, content: content_str)
+            end
+
+            def invoke_editor(file_path, encryption_key:)
+               Tempfile.create(file_path.basename.to_s) do |tmp_file|
+                  decrypted = read_encrypted_file(file_path, encryption_key: encryption_key)
 
                   tmp_file.write(decrypted)
                   tmp_file.rewind # rewind needed because file does not get closed after write
                   system(ENV.fetch('EDITOR', 'editor'), tmp_file.path, exception: true)
                   tmp_file.read
                end
-
-               write_encrypted_file(file_path, encryption_key: encryption_key, content: file_str)
             end
 
             def determine_key(file_path)
@@ -282,7 +314,7 @@ module Invar
          end
 
          # General status tasks
-         class StateTask < NamespacedTask
+         class StatusHandler < NamespacedFileTask
             # Prints the current paths to be searched in
             def show_paths
                warn @locator.search_paths.join("\n")

@@ -42,7 +42,7 @@ module Invar
                task.reenable
 
                # Prevent it from opening actual editor
-               allow_any_instance_of(Invar::Rake::Tasks::NamespacedTask).to receive(:system)
+               allow_any_instance_of(Invar::Rake::Tasks::NamespacedFileTask).to receive(:system)
             end
 
             # Silencing the terminal output because there is a lot of it
@@ -118,7 +118,7 @@ module Invar
                   it 'should provide instructions for handling the secret' do
                      expect do
                         task.invoke
-                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+                     end.to output(include(Invar::Rake::Tasks::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
                   end
 
                   # this allows easier piping to a file or whatever
@@ -233,7 +233,7 @@ module Invar
                   it 'should provide instructions for handling the secret' do
                      expect do
                         task.invoke
-                     end.to output(include(Invar::Rake::Tasks::SecretTask::SECRETS_INSTRUCTIONS)).to_stderr
+                     end.to output(include(Invar::Rake::Tasks::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
                   end
 
                   # this allows easier piping to a file or whatever
@@ -322,7 +322,7 @@ module Invar
 
                   it 'should edit the config file in the XDG_CONFIG_HOME path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask)
+                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
                            .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
@@ -374,7 +374,7 @@ module Invar
 
                   it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigTask)
+                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
                            .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
@@ -544,7 +544,7 @@ module Invar
                      allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::SecretTask)
+                     expect_any_instance_of(Invar::Rake::Tasks::SecretsFileHandler)
                            .to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
                      task.invoke
@@ -590,6 +590,180 @@ module Invar
                   end
 
                   it 'should state the file saved' do
+                     Lockbox.master_key = default_lockbox_key
+
+                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                  end
+               end
+            end
+
+            context 'invar:rotate' do
+               let(:task) { ::Rake::Task['invar:rotate'] }
+
+               before(:each) do
+                  # Prevent it from opening actual editor
+                  allow(Invar::Rake::Tasks).to receive(:system)
+               end
+
+               it 'should define a key rotation task' do
+                  expect(::Rake::Task.task_defined?('invar:rotate')).to be true
+               end
+
+               context '$HOME is defined' do
+                  let(:home) { '/some/home/dir' }
+                  let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+                  let(:secrets_path) { configs_dir / 'secrets.yml' }
+                  let(:secrets_content) do
+                     <<~YML
+                        ---
+                        password: mellon
+                     YML
+                  end
+
+                  around(:each) do |example|
+                     old_home    = Dir.home
+                     ENV['HOME'] = home.to_s
+                     example.run
+                     ENV['HOME'] = old_home
+                  end
+
+                  before(:each) do
+                     configs_dir.mkpath
+                     lockbox = Lockbox.new(key: default_lockbox_key)
+
+                     secrets_path.write lockbox.encrypt(secrets_content)
+                     secrets_path.chmod 0o600
+                  end
+
+                  context 'Lockbox master key is defined' do
+                     before(:each) do
+                        Lockbox.master_key = default_lockbox_key
+                     end
+
+                     around(:each) do |example|
+                        old_key            = Lockbox.master_key
+                        Lockbox.master_key = default_lockbox_key
+                        example.run
+                        Lockbox.master_key = old_key
+                     end
+
+                     it 'should NOT ask for it from STDIN' do
+                        msg = 'Enter master key to decrypt'
+
+                        expect do
+                           $stdin = double('fake IO', noecho: default_lockbox_key)
+                           task.invoke
+                           $stdin = STDIN
+                        end.to_not output(include(msg)).to_stderr
+                     end
+                  end
+
+                  context 'Lockbox master key is undefined' do
+                     around(:each) do |example|
+                        old_key            = Lockbox.master_key
+                        Lockbox.master_key = nil
+                        example.run
+                        Lockbox.master_key = old_key
+                     end
+
+                     context 'STDIN can #noecho' do
+                        it 'should ask for it from STDIN' do
+                           msg = "Enter master key to decrypt #{ secrets_path }:"
+
+                           expect do
+                              $stdin = double('fake IO', noecho: default_lockbox_key)
+                              task.invoke
+                              $stdin = STDIN
+                           end.to output(start_with(msg)).to_stderr
+                        end
+
+                        it 'should read the password from STDIN without echo' do
+                           input = double('fake input')
+
+                           $stdin = input
+
+                           expect(input).to receive(:noecho).and_return default_lockbox_key
+
+                           task.invoke
+
+                           $stdin = STDIN
+                        end
+                     end
+
+                     context 'STDIN cannot #noecho' do
+                        let(:input) { StringIO.new }
+
+                        around(:each) do |example|
+                           $stdin = input
+                           example.run
+                           $stdin = STDIN
+                        end
+
+                        it 'should raise an error instead of asking from STDIN' do
+                           expect do
+                              task.invoke
+                           end.to(raise_error(Invar::SecretsFileEncryptionError).and(output('').to_stderr))
+                        end
+                     end
+                  end
+
+                  it 'should abort if the file does not exist' do
+                     secrets_path.delete
+
+                     xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+                     xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
+
+                     search_path = [Pathname.new(xdg_home).expand_path / name]
+                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+
+                     msg = <<~MSG
+                        Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
+                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
+                     MSG
+
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                  end
+
+                  let(:new_key) do
+                     $stdout.rewind
+                     $stdout.readline.chomp
+                  end
+
+                  it 'should re-encrypt the file under the new key' do
+                     Lockbox.master_key = default_lockbox_key
+
+                     task.invoke
+
+                     lockbox = Lockbox.new(key: new_key)
+
+                     expect(lockbox.decrypt(secrets_path.read)).to eq secrets_content
+                  end
+
+                  it 'should clean up the swap file' do
+                     Lockbox.master_key = default_lockbox_key
+
+                     task.invoke
+
+                     expect(File).to_not exist("#{ secrets_path }.#{ Tasks::SecretsFileHandler::SWAP_EXT }")
+                  end
+
+                  it 'should return the swap file when aborting' do
+                     Lockbox.master_key = default_lockbox_key
+
+                     secrets_path.chmod 0o400 # read-only
+                     allow(File).to receive(:open) do
+                        raise Errno::ENOSPC, 'Dummy write failure'
+                     end
+                     task.invoke
+
+                     expect(File).to_not exist("#{ secrets_path }.#{ Tasks::SecretsFileHandler::SWAP_EXT }")
+                     expect(File).to exist(secrets_path)
+
+                     lockbox = Lockbox.new(key: default_lockbox_key)
+                     expect(lockbox.decrypt(secrets_path.read)).to eq secrets_content
+                  end
+
+                  it 'should state the updated file' do
                      Lockbox.master_key = default_lockbox_key
 
                      expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
