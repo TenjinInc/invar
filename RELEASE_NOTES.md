@@ -13,6 +13,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Minor Changes
 
+* none
+
+### Bugfixes
+
+* none
+
+## [0.9.0] - 2023-09-24
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
 * Added Rake task for secrets file key rotation
 * Added ability for invar:config and invar:secrets to take replacement content over `STDIN` instead of live editing
 
