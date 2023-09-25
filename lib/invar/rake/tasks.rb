@@ -71,7 +71,7 @@ module Invar
                when 'secrets'
                   config = nil
                else
-                  raise "unknown mode #{ mode }. Must be one of 'config' or 'secrets'" unless mode.nil?
+                  raise ArgumentError, "unknown mode '#{ mode }'. Must be one of 'config' or 'secrets'" unless mode.nil?
                end
 
                assert_init_conditions(config&.file_path, secrets&.file_path)
@@ -116,12 +116,12 @@ module Invar
          def assert_init_conditions(config_file, secrets_file)
             return unless config_file&.exist? || secrets_file&.exist?
 
-            msg = if !config_file&.exist?
+            msg = if !config_file.exist?
                      <<~MSG
                         Abort: Secrets file already exists (#{ secrets_file })
                         Run this to init only the config file: bundle exec rake tasks invar:init[config]
                      MSG
-                  elsif !secrets_file&.exist?
+                  elsif !secrets_file.exist?
                      <<~MSG
                         Abort: Config file already exists (#{ config_file })
                         Run this to init only the secrets file: bundle exec rake tasks invar:init[secrets]
@@ -158,8 +158,6 @@ module Invar
          class ConfigFileHandler < NamespacedFileTask
             # Creates a config file in the appropriate location
             def create
-               raise 'File already exists' if file_path.exist?
-
                config_dir.mkpath
                file_path.write CONFIG_TEMPLATE
                file_path.chmod 0o600
@@ -209,8 +207,6 @@ module Invar
 
             # Creates a new encrypted secrets file and prints the generated encryption key to STDOUT
             def create(content: SECRETS_TEMPLATE)
-               raise 'File already exists' if file_path.exist?
-
                encryption_key = Lockbox.generate_key
 
                write_encrypted_file(file_path,

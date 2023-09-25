@@ -97,6 +97,13 @@ module Invar
                      expect(secrets_path).to exist
                   end
 
+                  it 'should complain when specified file type is wrong' do
+                     expect do
+                        task.invoke('other')
+
+                     end.to raise_error ArgumentError, "unknown mode 'other'. Must be one of 'config' or 'secrets'"
+                  end
+
                   it 'should declare the files it created' do
                      expected_output = include(config_path.to_s).and include(secrets_path.to_s)
 
