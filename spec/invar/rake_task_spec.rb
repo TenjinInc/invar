@@ -395,6 +395,45 @@ module Invar
                      expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
                   end
                end
+
+               context 'content provided in stdin' do
+                  let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+                  let(:config_path) { configs_dir / 'config.yml' }
+
+                  before(:each) do
+                     configs_dir.mkpath
+                     config_path.write ''
+                  end
+
+                  let(:input_string) do
+                     <<~YML
+                        ---
+                        breakfast: 'second'
+                     YML
+                  end
+                  let(:input) do
+                     StringIO.new input_string
+                  end
+
+                  around(:each) do |example|
+                     $stdin = input
+                     example.run
+                     $stdin = STDIN
+                  end
+
+                  it 'should not open the editor' do
+                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
+                           .to_not receive(:system).with('editor')
+
+                     task.invoke
+                  end
+
+                  it 'should use the provided content' do
+                     task.invoke
+
+                     expect(config_path.read).to eq input_string
+                  end
+               end
             end
 
             context 'invar:secrets' do
@@ -451,7 +490,7 @@ module Invar
                         msg = 'Enter master key to decrypt'
 
                         expect do
-                           $stdin = double('fake IO', noecho: default_lockbox_key)
+                           $stdin = double('fake IO', noecho: default_lockbox_key, tty?: true)
                            task.invoke
                            $stdin = STDIN
                         end.to_not output(include(msg)).to_stderr
@@ -471,14 +510,14 @@ module Invar
                            msg = "Enter master key to decrypt #{ secrets_path }:"
 
                            expect do
-                              $stdin = double('fake IO', noecho: default_lockbox_key)
+                              $stdin = double('fake IO', noecho: default_lockbox_key, tty?: true)
                               task.invoke
                               $stdin = STDIN
                            end.to output(start_with(msg)).to_stderr
                         end
 
                         it 'should read the password from STDIN without echo' do
-                           input = double('fake input')
+                           input = double('fake input', tty?: true)
 
                            $stdin = input
 
@@ -522,6 +561,12 @@ module Invar
                      MSG
 
                      expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                  end
+
+                  it 'should state the file saved' do
+                     Lockbox.master_key = default_lockbox_key
+
+                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
                   end
 
                   it 'should clone the decrypted contents into the tempfile' do
@@ -589,10 +634,38 @@ module Invar
                      expect(mode).to eq custom_permissions
                   end
 
-                  it 'should state the file saved' do
-                     Lockbox.master_key = default_lockbox_key
+                  context 'content provided in stdin' do
+                     let(:input_string) do
+                        <<~YML
+                           ---
+                           password: 'mellon'
+                        YML
+                     end
+                     let(:input) do
+                        StringIO.new input_string
+                     end
 
-                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                     around(:each) do |example|
+                        $stdin = input
+                        example.run
+                        $stdin = STDIN
+                     end
+
+                     it 'should not open the editor' do
+                        expect_any_instance_of(Invar::Rake::Tasks::SecretsFileHandler)
+                              .to_not receive(:system).with('editor')
+
+                        task.invoke
+                     end
+
+                     it 'should use the provided content' do
+                        Lockbox.master_key = default_lockbox_key
+
+                        task.invoke
+
+                        lockbox = Lockbox.new(key: default_lockbox_key)
+                        expect(lockbox.decrypt(secrets_path.read)).to eq input_string
+                     end
                   end
                end
             end

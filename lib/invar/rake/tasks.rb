@@ -169,22 +169,29 @@ module Invar
 
             # Edits the existing config file in the appropriate location
             def edit
-               configs_file = begin
-                                 @locator.find('config.yml')
-                              rescue ::Invar::FileLocator::FileNotFoundError => e
-                                 warn <<~ERR
-                                    Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
-                                    #{ CREATE_SUGGESTION }
-                                 ERR
-                                 exit 1
-                              end
+               content   = $stdin.tty? ? nil : $stdin.read
+               file_path = configs_file
 
-               system(ENV.fetch('EDITOR', 'editor'), configs_file.to_s, exception: true)
+               if content
+                  file_path.write content
+               else
+                  system ENV.fetch('EDITOR', 'editor'), file_path.to_s, exception: true
+               end
 
-               warn "File saved to: #{ configs_file }"
+               warn "File saved to: #{ file_path }"
             end
 
             private
+
+            def configs_file
+               @locator.find 'config.yml'
+            rescue ::Invar::FileLocator::FileNotFoundError => e
+               warn <<~ERR
+                  Abort: #{ e.message }. Searched in: #{ @locator.search_paths.join(', ') }
+                  #{ CREATE_SUGGESTION }
+               ERR
+               exit 1
+            end
 
             def filename
                'config.yml'
@@ -215,10 +222,14 @@ module Invar
                puts encryption_key
             end
 
-            # Opens an editor for the decrypted contents of the secrets file. After closing the editor, the file will be
-            # updated with the new encrypted contents.
+            # Updates the file with new content.
+            #
+            # Either the content is provided over STDIN or the default editor is opened with the decrypted contents of
+            # the secrets file. After closing the editor, the file will be updated with the new encrypted contents.
             def edit
-               edit_encrypted_file(secrets_file)
+               content = $stdin.tty? ? nil : $stdin.read
+
+               edit_encrypted_file(secrets_file, content: content)
 
                warn "File saved to #{ secrets_file }"
             end
@@ -228,16 +239,14 @@ module Invar
 
                decrypted = read_encrypted_file(file_path, encryption_key: determine_key(file_path))
 
-               # # TODO: use rename instead when FakeFS removed
-               swap_file = Pathname.new("#{ File.dirname(file_path.to_s) }/#{ file_path.basename }.#{ SWAP_EXT }")
-               # file_path.rename swap_file
-               File.rename(file_path.to_s, swap_file.to_s)
+               swap_file = file_path.dirname / [file_path.basename, SWAP_EXT].join('.')
+               file_path.rename swap_file
 
                begin
-                  create(content: decrypted)
+                  create content: decrypted
                   swap_file.delete
                rescue StandardError
-                  File.rename(swap_file.to_s, file_path.to_s)
+                  swap_file.rename file_path.to_s
                end
             end
 
@@ -263,7 +272,7 @@ module Invar
             end
 
             def write_encrypted_file(file_path, encryption_key:, content:, permissions: nil)
-               lockbox = Lockbox.new(key: encryption_key)
+               lockbox = build_lockbox(encryption_key)
 
                encrypted_data = lockbox.encrypt(content)
 
@@ -278,9 +287,9 @@ module Invar
             def edit_encrypted_file(file_path, content: nil)
                encryption_key = determine_key(file_path)
 
-               content_str = content || invoke_editor(file_path, encryption_key: encryption_key)
+               content ||= invoke_editor(file_path, encryption_key: encryption_key)
 
-               write_encrypted_file(file_path, encryption_key: encryption_key, content: content_str)
+               write_encrypted_file(file_path, encryption_key: encryption_key, content: content)
             end
 
             def invoke_editor(file_path, encryption_key:)

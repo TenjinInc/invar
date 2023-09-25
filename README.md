@@ -217,6 +217,10 @@ To open the file your system's default text editor (eg. nano):
 
     bundle exec rake invar:config
 
+> **Automation tip** You can provide new content over STDIN
+>
+>     bundle exec rake invar:config < config_template.yml
+
 #### Edit Secrets File
 
 To edit the secrets file, run this and provide the file's encryption key:
@@ -226,9 +230,13 @@ To edit the secrets file, run this and provide the file's encryption key:
 The file will be decrypted and opened in your default editor like the config file. Once you have exited the editor, it
 will be re-encrypted. **Remember to save your changes!**
 
-> **Automation tip** you can set the current encryption key in the `LOCKBOX_MASTER_KEY` environment variable:
+> **Automation tip** You can set the current encryption key in the `LOCKBOX_MASTER_KEY` environment variable:
 >
 >     LOCKBOX_MASTER_KEY=sooper_sekret_key_here bundle exec rake invar:secrets
+
+> **Automation tip** Like invar:config, you can provide new content over STDIN
+>
+>     bundle exec rake invar:secrets < secrets_template.yml
 
 #### Rotating the Secrets File Encryption Key
 
