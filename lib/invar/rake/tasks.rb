@@ -3,7 +3,6 @@
 require 'invar'
 
 require 'rake'
-require 'io/console'
 require 'tempfile'
 
 require_relative 'task/config'

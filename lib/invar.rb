@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# Needed for TTY input handling
+# Do not remove; it missing will not always break tests due to test environments requiring it themselves
+require 'io/console'
+
 require_relative 'invar/version'
 require_relative 'invar/errors'
 require_relative 'invar/reality'
