@@ -152,11 +152,9 @@ module Invar
       end
 
       def resolve_key(pathname, locator, prompt)
-         key_file = locator.find(pathname)
-
-         read_keyfile(key_file)
+         read_keyfile locator.find pathname
       rescue FileLocator::FileNotFoundError
-         if $stdin.respond_to?(:noecho)
+         if $stdin.tty?
             warn prompt
             $stdin.noecho(&:gets).strip
          else

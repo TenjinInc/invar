@@ -45,6 +45,10 @@ module Invar
                allow_any_instance_of(Invar::Rake::Task::NamespacedFileTask).to receive(:system)
             end
 
+            before :each do
+               allow($stdin).to receive(:tty?).and_return(tty_status)
+            end
+
             # Silencing the terminal output because there is a lot of it
             around(:each) do |example|
                $stdout = StringIO.new
@@ -53,6 +57,8 @@ module Invar
                $stdout = STDOUT
                $stderr = STDERR
             end
+
+            let(:tty_status) { true }
 
             context 'invar:init' do
                let(:task) { ::Rake::Task['invar:init'] }
@@ -402,7 +408,7 @@ module Invar
                   end
                end
 
-               context 'content provided in stdin' do
+               context 'content provided in stdin pipe' do
                   let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                   let(:config_path) { configs_dir / 'config.yml' }
 
@@ -417,14 +423,13 @@ module Invar
                         breakfast: 'second'
                      YML
                   end
-                  let(:input) do
-                     StringIO.new input_string
-                  end
 
+                  # tty is false when stdin is piped
+                  let(:tty_status) { false }
                   around(:each) do |example|
-                     $stdin = input
-                     example.run
-                     $stdin = STDIN
+                     with_pipe_input input_string do
+                        example.call
+                     end
                   end
 
                   it 'should not open the editor' do
@@ -490,10 +495,10 @@ module Invar
                      it 'should NOT ask for it from STDIN' do
                         msg = 'Enter master key to decrypt'
 
+                        expect($stdin).to_not receive(:noecho)
+
                         expect do
-                           $stdin = double('fake IO', noecho: default_lockbox_key, tty?: true)
                            task.invoke
-                           $stdin = STDIN
                         end.to_not output(include(msg)).to_stderr
                      end
                   end
@@ -506,43 +511,33 @@ module Invar
                         Lockbox.master_key = old_key
                      end
 
-                     context 'STDIN can #noecho' do
+                     context 'STDIN is TTY' do
+                        let(:tty_status) { true }
+
                         it 'should ask for it from STDIN' do
                            msg = "Enter master key to decrypt #{ secrets_path }:"
 
+                           expect($stdin).to receive(:noecho).and_return default_lockbox_key
+
                            expect do
-                              $stdin = double('fake IO', noecho: default_lockbox_key, tty?: true)
                               task.invoke
-                              $stdin = STDIN
                            end.to output(start_with(msg)).to_stderr
                         end
 
                         it 'should read the password from STDIN without echo' do
-                           input = double('fake input', tty?: true)
-
-                           $stdin = input
-
-                           expect(input).to receive(:noecho).and_return default_lockbox_key
+                           expect($stdin).to receive(:noecho).and_return default_lockbox_key
 
                            task.invoke
-
-                           $stdin = STDIN
                         end
                      end
 
-                     context 'STDIN cannot #noecho' do
-                        let(:input) { StringIO.new }
-
-                        around(:each) do |example|
-                           $stdin = input
-                           example.run
-                           $stdin = STDIN
-                        end
+                     context 'STDIN is not TTY' do
+                        let(:tty_status) { false }
 
                         it 'should raise an error instead of asking from STDIN' do
                            expect do
                               task.invoke
-                           end.to(raise_error(Invar::SecretsFileEncryptionError).and(output('').to_stderr))
+                           end.to raise_error(Invar::SecretsFileEncryptionError).and output('').to_stderr
                         end
                      end
                   end
@@ -635,21 +630,18 @@ module Invar
                      expect(mode).to eq custom_permissions
                   end
 
-                  context 'content provided in stdin' do
+                  context 'content provided in stdin pipe' do
                      let(:input_string) do
                         <<~YML
                            ---
                            password: 'mellon'
                         YML
                      end
-                     let(:input) do
-                        StringIO.new input_string
-                     end
 
                      around(:each) do |example|
-                        $stdin = input
-                        example.run
-                        $stdin = STDIN
+                        with_pipe_input input_string do
+                           example.call
+                        end
                      end
 
                      it 'should not open the editor' do
@@ -719,10 +711,11 @@ module Invar
                      it 'should NOT ask for it from STDIN' do
                         msg = 'Enter master key to decrypt'
 
+                        expect($stdin).to_not receive(:gets)
+                        expect($stdin).to_not receive(:noecho)
+
                         expect do
-                           $stdin = double('fake IO', noecho: default_lockbox_key)
                            task.invoke
-                           $stdin = STDIN
                         end.to_not output(include(msg)).to_stderr
                      end
                   end
@@ -735,43 +728,27 @@ module Invar
                         Lockbox.master_key = old_key
                      end
 
-                     context 'STDIN can #noecho' do
-                        it 'should ask for it from STDIN' do
+                     context 'STDIN is TTY' do
+                        let(:tty_status) { true }
+
+                        it 'should ask for it from STDIN without echo' do
                            msg = "Enter master key to decrypt #{ secrets_path }:"
 
+                           expect($stdin).to receive(:noecho).and_return default_lockbox_key
+
                            expect do
-                              $stdin = double('fake IO', noecho: default_lockbox_key)
                               task.invoke
-                              $stdin = STDIN
                            end.to output(start_with(msg)).to_stderr
-                        end
-
-                        it 'should read the password from STDIN without echo' do
-                           input = double('fake input')
-
-                           $stdin = input
-
-                           expect(input).to receive(:noecho).and_return default_lockbox_key
-
-                           task.invoke
-
-                           $stdin = STDIN
                         end
                      end
 
-                     context 'STDIN cannot #noecho' do
-                        let(:input) { StringIO.new }
-
-                        around(:each) do |example|
-                           $stdin = input
-                           example.run
-                           $stdin = STDIN
-                        end
+                     context 'STDIN is not TTY' do
+                        let(:tty_status) { false }
 
                         it 'should raise an error instead of asking from STDIN' do
                            expect do
                               task.invoke
-                           end.to(raise_error(Invar::SecretsFileEncryptionError).and(output('').to_stderr))
+                           end.to raise_error(Invar::SecretsFileEncryptionError).and output('').to_stderr
                         end
                      end
                   end

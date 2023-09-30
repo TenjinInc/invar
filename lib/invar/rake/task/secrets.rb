@@ -32,7 +32,7 @@ module Invar
             # Either the content is provided over STDIN or the default editor is opened with the decrypted contents of
             # the secrets file. After closing the editor, the file will be updated with the new encrypted contents.
             def edit
-               content = $stdin.tty? ? nil : $stdin.read
+               content = $stdin.stat.pipe? ? $stdin.read : nil
 
                edit_encrypted_file(secrets_file, content: content)
 
@@ -111,7 +111,7 @@ module Invar
             def determine_key(file_path)
                encryption_key = Lockbox.master_key
 
-               if encryption_key.nil? && $stdin.respond_to?(:noecho)
+               if encryption_key.nil? && $stdin.tty?
                   warn "Enter master key to decrypt #{ file_path }:"
                   encryption_key = $stdin.noecho(&:gets).strip
                end

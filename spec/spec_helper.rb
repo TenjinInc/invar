@@ -14,6 +14,23 @@ require 'pp'
 require 'fakefs/safe'
 require 'fakefs/spec_helpers'
 
+module SpecHelpers
+   def with_pipe_input(input)
+      original_stdin = $stdin
+
+      IO.pipe do |reader, writer|
+         $stdin = reader
+         writer.puts input
+         writer.close # signal that input is totes dunzo
+         yield
+      end
+
+      $stdin = original_stdin
+   end
+end
+
 RSpec.configure do |config|
    config.include FakeFS::SpecHelpers
+
+   config.include SpecHelpers
 end

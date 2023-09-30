@@ -125,7 +125,7 @@ module Invar
          context 'file cannot be found' do
             it 'should explode' do
                expect do
-                  locator.find('bogus.yml')
+                  locator.find 'bogus.yml'
                end.to raise_error FileLocator::FileNotFoundError, 'Could not find bogus.yml'
             end
          end
@@ -151,13 +151,13 @@ module Invar
 
             it 'should describe the problem' do
                expect do
-                  locator.find(filename)
+                  locator.find filename
                end.to raise_error AmbiguousSourceError, include('Found more than 1 config.yml file')
             end
 
             it 'should list the places it found files' do
                expect do
-                  locator.find(filename)
+                  locator.find filename
                end.to raise_error AmbiguousSourceError, include([path_a, path_b].join(', '))
             end
          end

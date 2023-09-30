@@ -310,54 +310,44 @@ module Invar
                   Lockbox.master_key = old_key
                end
 
-               it 'should ask for it from STDIN' do
-                  msg = 'Enter master key to decrypt'
-
-                  expect do
-                     $stdin = double('fake IO', noecho: default_lockbox_key)
-                     described_class.new namespace: name
-                     $stdin = STDIN
-                  end.to output(start_with(msg)).to_stderr
+               before :each do
+                  allow($stdin).to receive(:noecho).and_return default_lockbox_key
                end
 
-               it 'should mention the file it is decrypting' do
-                  path = Pathname.new('~/.config/') / name / 'secrets.yml'
-
-                  expect do
-                     $stdin = double('fake IO', noecho: default_lockbox_key)
-                     described_class.new namespace: name
-                     $stdin = STDIN
-                  end.to output(include(path.expand_path.to_s)).to_stderr
+               before :each do
+                  allow($stdin).to receive(:tty?).and_return(tty_status)
                end
 
-               it 'should read the password from STDIN without echo' do
-                  input = double('fake input')
+               context 'STDIN is TTY' do
+                  let(:tty_status) { true }
 
-                  $stdin = input
+                  it 'should ask for it from STDIN' do
+                     msg = 'Enter master key to decrypt'
 
-                  expect(input).to receive(:noecho).and_return default_lockbox_key
+                     expect($stdin).to receive(:noecho).and_return default_lockbox_key
 
-                  $stderr = StringIO.new
-                  described_class.new namespace: name
-                  $stderr = STDERR
-
-                  $stdin = STDIN
-               end
-
-               context 'STDIN cannot #noecho' do
-                  let(:input) { StringIO.new }
-
-                  around(:each) do |example|
-                     $stdin = input
-                     example.run
-                     $stdin = STDIN
+                     expect do
+                        described_class.new namespace: name
+                     end.to output(start_with(msg)).to_stderr
                   end
+
+                  it 'should mention the file it is decrypting' do
+                     path = Pathname.new('~/.config/') / name / 'secrets.yml'
+
+                     expect do
+                        described_class.new namespace: name
+                     end.to output(include(path.expand_path.to_s)).to_stderr
+                  end
+               end
+
+               context 'STDIN is not TTY' do
+                  let(:tty_status) { false }
 
                   it 'should raise an error instead of asking' do
                      expect do
                         expect do
                            described_class.new namespace: name
-                        end.to(raise_error(SecretsFileDecryptionError))
+                        end.to raise_error SecretsFileDecryptionError
                      end.to_not output.to_stderr
                   end
 

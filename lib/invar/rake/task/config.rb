@@ -18,7 +18,7 @@ module Invar
 
             # Edits the existing config file in the appropriate location
             def edit
-               content   = $stdin.tty? ? nil : $stdin.read
+               content   = $stdin.stat.pipe? ? $stdin.read : nil
                file_path = configs_file
 
                if content
