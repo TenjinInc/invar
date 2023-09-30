@@ -42,7 +42,7 @@ module Invar
                task.reenable
 
                # Prevent it from opening actual editor
-               allow_any_instance_of(Invar::Rake::Tasks::NamespacedFileTask).to receive(:system)
+               allow_any_instance_of(Invar::Rake::Task::NamespacedFileTask).to receive(:system)
             end
 
             # Silencing the terminal output because there is a lot of it
@@ -119,13 +119,13 @@ module Invar
 
                      encrypted = secrets_path.binread
 
-                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
+                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Task::SECRETS_TEMPLATE
                   end
 
                   it 'should provide instructions for handling the secret' do
                      expect do
                         task.invoke
-                     end.to output(include(Invar::Rake::Tasks::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
+                     end.to output(include(Invar::Rake::Task::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
                   end
 
                   # this allows easier piping to a file or whatever
@@ -234,13 +234,13 @@ module Invar
 
                      encrypted = secrets_path.binread
 
-                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Tasks::SECRETS_TEMPLATE
+                     expect(box.decrypt(encrypted)).to eq Invar::Rake::Task::SECRETS_TEMPLATE
                   end
 
                   it 'should provide instructions for handling the secret' do
                      expect do
                         task.invoke
-                     end.to output(include(Invar::Rake::Tasks::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
+                     end.to output(include(Invar::Rake::Task::SecretsFileHandler::SECRETS_INSTRUCTIONS)).to_stderr
                   end
 
                   # this allows easier piping to a file or whatever
@@ -329,7 +329,7 @@ module Invar
 
                   it 'should edit the config file in the XDG_CONFIG_HOME path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
+                     expect_any_instance_of(Invar::Rake::Task::ConfigFileHandler)
                            .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
@@ -346,7 +346,7 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
                      MSG
 
                      expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -381,7 +381,7 @@ module Invar
 
                   it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
+                     expect_any_instance_of(Invar::Rake::Task::ConfigFileHandler)
                            .to receive(:system).with('editor', config_path.to_s, exception: true)
 
                      task.invoke
@@ -392,7 +392,7 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
                      MSG
 
                      expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -429,7 +429,7 @@ module Invar
                   end
 
                   it 'should not open the editor' do
-                     expect_any_instance_of(Invar::Rake::Tasks::ConfigFileHandler)
+                     expect_any_instance_of(Invar::Rake::Task::ConfigFileHandler)
                            .to_not receive(:system).with('editor')
 
                      task.invoke
@@ -445,11 +445,6 @@ module Invar
 
             context 'invar:secrets' do
                let(:task) { ::Rake::Task['invar:secrets'] }
-
-               before(:each) do
-                  # Prevent it from opening actual editor
-                  allow(Invar::Rake::Tasks).to receive(:system)
-               end
 
                it 'should define a secrets edit task' do
                   expect(::Rake::Task.task_defined?('invar:secrets')).to be true
@@ -564,7 +559,7 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
                      MSG
 
                      expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -596,7 +591,7 @@ module Invar
                      allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Tasks::SecretsFileHandler)
+                     expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
                            .to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
                      task.invoke
@@ -659,7 +654,7 @@ module Invar
                      end
 
                      it 'should not open the editor' do
-                        expect_any_instance_of(Invar::Rake::Tasks::SecretsFileHandler)
+                        expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
                               .to_not receive(:system).with('editor')
 
                         task.invoke
@@ -679,11 +674,6 @@ module Invar
 
             context 'invar:rotate' do
                let(:task) { ::Rake::Task['invar:rotate'] }
-
-               before(:each) do
-                  # Prevent it from opening actual editor
-                  allow(Invar::Rake::Tasks).to receive(:system)
-               end
 
                it 'should define a key rotation task' do
                   expect(::Rake::Task.task_defined?('invar:rotate')).to be true
@@ -798,7 +788,7 @@ module Invar
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-                        #{ Invar::Rake::Tasks::CREATE_SUGGESTION }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
                      MSG
 
                      expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
@@ -824,7 +814,7 @@ module Invar
 
                      task.invoke
 
-                     expect(File).to_not exist("#{ secrets_path }.#{ Tasks::SecretsFileHandler::SWAP_EXT }")
+                     expect(File).to_not exist("#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }")
                   end
 
                   it 'should return the swap file when aborting' do
@@ -836,7 +826,7 @@ module Invar
                      end
                      task.invoke
 
-                     expect(File).to_not exist("#{ secrets_path }.#{ Tasks::SecretsFileHandler::SWAP_EXT }")
+                     expect(File).to_not exist("#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }")
                      expect(File).to exist(secrets_path)
 
                      lockbox = Lockbox.new(key: default_lockbox_key)
