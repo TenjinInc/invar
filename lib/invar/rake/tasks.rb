@@ -11,10 +11,11 @@ require_relative 'task/secrets'
 require_relative 'task/status'
 
 module Invar
-   # Rake task implementation.
+   # Rake task module for Invar-related tasks.
    #
-   # The actual rake tasks themselves are thinly defined in invar/rake.rb (so that the external include
-   # path is nice and short)
+   # The specific rake task implementations are delegated to handlers in Invar::Rake::Task
+   #
+   # @see Invar::Rake::Tasks.define
    module Rake
       # RakeTask builder class. Use Tasks.define to generate the needed tasks.
       class Tasks
