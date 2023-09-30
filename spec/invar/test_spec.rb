@@ -43,9 +43,17 @@ describe 'Invar test extension' do
          end
 
          describe '.after_load' do
-            it 'should explode' do
+            it 'should explode when calling the method normally' do
                expect do
                   Invar.after_load do |_|
+                     # etc
+                  end
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
+            end
+
+            it 'should explode when using #method' do
+               expect do
+                  Invar.method(:after_load).call do |_|
                      # etc
                   end
                end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
@@ -53,35 +61,65 @@ describe 'Invar test extension' do
          end
 
          describe '.clear_hooks' do
-            it 'should explode' do
+            it 'should explode when calling the method normally' do
                expect do
                   Invar.clear_hooks
                end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
             end
+
+            it 'should explode when using #method' do
+               expect do
+                  Invar.method(:clear_hooks).call
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
+            end
+         end
+
+         it 'should raise error as normal for non-test methods' do
+            # using normal calls
+            expect do
+               Invar.asdf
+            end.to raise_error NoMethodError
+
+            # and using #method
+            expect do
+               Invar.method(:asdf).call
+            end.to raise_error NameError
          end
       end
 
       describe Invar::Scope do
-         describe '#pretend' do
-            let(:data) do
-               {
-                     event: 'Birthday',
-                     host:  'Bilbo Baggins'
-               }
-            end
-            let(:scope) { described_class.new data }
+         let(:data) do
+            {
+                  event: 'Birthday',
+                  host:  'Bilbo Baggins'
+            }
+         end
+         let(:scope) { described_class.new data }
 
-            it 'should explode when called outside of a pretend' do
+         describe '#pretend' do
+            it 'should explode when calling the method normally' do
                expect do
                   scope.pretend event: 'Disappearance'
                end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::PRETEND_MSG
             end
 
-            it 'should raise error as normal for other methods' do
+            it 'should explode when using #method' do
                expect do
-                  scope.asdf
-               end.to raise_error NoMethodError
+                  scope.method(:pretend).call event: 'Disappearance'
+               end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::PRETEND_MSG
             end
+         end
+
+         it 'should raise error as normal for non-test methods' do
+            # using normal calls
+            expect do
+               scope.asdf
+            end.to raise_error NoMethodError
+
+            # and using #method
+            expect do
+               scope.method(:asdf).call
+            end.to raise_error NameError
          end
       end
    end

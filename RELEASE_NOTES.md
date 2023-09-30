@@ -17,7 +17,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Bugfixes
 
-* none
+* Improved handling of test-only methods when trying to access them via `#method`
 
 ## [0.9.0] - 2023-09-24
 

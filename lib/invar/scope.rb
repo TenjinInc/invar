@@ -25,10 +25,16 @@ module Invar
       alias / fetch
       alias [] fetch
 
-      def method_missing(symbol, *args)
-         raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG if symbol == :pretend
+      def method_missing(method_name, *args)
+         guard_test_methods method_name
 
          super
+      end
+
+      def respond_to_missing?(method_name, include_all)
+         guard_test_methods method_name
+
+         super method_name, include_all
       end
 
       # Returns a hash representation of this scope and subscopes.
@@ -50,6 +56,10 @@ module Invar
       end
 
       private
+
+      def guard_test_methods(method_name)
+         raise ::Invar::ImmutableRealityError, ::Invar::ImmutableRealityError::PRETEND_MSG if method_name == :pretend
+      end
 
       def known_keys
          @data.keys.sort.collect { |k| ":#{ k }" }.join(', ')

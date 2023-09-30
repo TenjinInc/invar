@@ -100,7 +100,6 @@ module Invar
                   it 'should complain when specified file type is wrong' do
                      expect do
                         task.invoke('other')
-
                      end.to raise_error ArgumentError, "unknown mode 'other'. Must be one of 'config' or 'secrets'"
                   end
 
