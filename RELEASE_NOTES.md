@@ -17,7 +17,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Bugfixes
 
+* none
+
+## [0.9.1] - 2023-09-30
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
 * Improved handling of test-only methods when trying to access them via `#method`
+* Fixed TTY detection
 
 ## [0.9.0] - 2023-09-24
 
