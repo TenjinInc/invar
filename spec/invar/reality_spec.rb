@@ -256,14 +256,11 @@ module Invar
                end
 
                it 'should default to the Lockbox master key' do
-                  old_key            = Lockbox.master_key
-                  Lockbox.master_key = default_lockbox_key
-
-                  expect do
-                     described_class.new namespace: name
-                  end.to_not output.to_stderr
-
-                  Lockbox.master_key = old_key
+                  with_lockbox_key default_lockbox_key do
+                     expect do
+                        described_class.new namespace: name
+                     end.to_not output.to_stderr
+                  end
                end
 
                let(:key_file) { Pathname.new('master_key') }
@@ -299,23 +296,14 @@ module Invar
             end
 
             context 'encryption key missing' do
-               before(:each) do
+               before :each do
                   key_path.delete
-               end
-
-               around(:each) do |example|
-                  old_key            = Lockbox.master_key
-                  Lockbox.master_key = nil
-                  example.run
-                  Lockbox.master_key = old_key
-               end
-
-               before :each do
                   allow($stdin).to receive(:noecho).and_return default_lockbox_key
+                  allow($stdin).to receive(:tty?).and_return(tty_status)
                end
 
-               before :each do
-                  allow($stdin).to receive(:tty?).and_return(tty_status)
+               around :each do |example|
+                  with_lockbox_key(nil, &example)
                end
 
                context 'STDIN is TTY' do
@@ -369,24 +357,25 @@ module Invar
 
             it 'should reraise decryption errors with additional information' do
                secrets_path.write 'badly-encrypted-content'
-               secrets_path.chmod(0o600)
+               secrets_path.chmod 0o600
 
                msg  = 'Failed to open'
                hint = 'Perhaps you used the wrong file decryption key?'
 
                expect do
                   described_class.new(namespace: name)
-               end.to raise_error(SecretsFileDecryptionError,
-                                  include(msg).and(include(secrets_path.to_s)).and(include(hint)))
+               end.to raise_error SecretsFileDecryptionError,
+                                  include(msg).and(include(secrets_path.to_s)).and(include(hint))
             end
 
             it 'should reraise key argument errors' do
-               Lockbox.master_key = nil
-               key_path.write '' # empty string is an invalid length key, which should cause a key error
+               with_lockbox_key nil do
+                  key_path.write '' # empty string is an invalid length key, which should cause a key error
 
-               expect do
-                  described_class.new namespace: name
-               end.to raise_error SecretsFileDecryptionError
+                  expect do
+                     described_class.new namespace: name
+                  end.to raise_error SecretsFileDecryptionError
+               end
             end
          end
       end
@@ -397,12 +386,12 @@ module Invar
          let(:name) { 'test-app' }
          let(:configs_schema) do
             Dry::Schema.define do
-               required(:location)
+               required :location
             end
          end
          let(:secrets_schema) do
             Dry::Schema.define do
-               required(:pass)
+               required :pass
             end
          end
          let(:invar) do
@@ -415,7 +404,7 @@ module Invar
          let(:configs_path) { configs_dir / 'config.yml' }
          let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-         before(:each) do
+         before :each do
             configs_path.dirname.mkpath
             configs_path.write <<~YML
                ---

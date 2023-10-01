@@ -450,6 +450,11 @@ module Invar
             context 'invar:secrets' do
                let(:task) { ::Rake::Task['invar:secrets'] }
 
+               before :each do
+                  # hard out on blocking reads to allow any test to fail that unexpectedly calls read
+                  expect($stdin).to_not receive(:gets)
+               end
+
                it 'should define a secrets edit task' do
                   expect(::Rake::Task.task_defined?('invar:secrets')).to be true
                end
@@ -481,15 +486,8 @@ module Invar
                   end
 
                   context 'Lockbox master key is defined' do
-                     before(:each) do
-                        Lockbox.master_key = default_lockbox_key
-                     end
-
                      around(:each) do |example|
-                        old_key            = Lockbox.master_key
-                        Lockbox.master_key = default_lockbox_key
-                        example.run
-                        Lockbox.master_key = old_key
+                        with_lockbox_key(default_lockbox_key, &example)
                      end
 
                      it 'should NOT ask for it from STDIN' do
@@ -505,10 +503,7 @@ module Invar
 
                   context 'Lockbox master key is undefined' do
                      around(:each) do |example|
-                        old_key            = Lockbox.master_key
-                        Lockbox.master_key = nil
-                        example.run
-                        Lockbox.master_key = old_key
+                        with_lockbox_key(nil, &example)
                      end
 
                      context 'STDIN is TTY' do
@@ -560,48 +555,51 @@ module Invar
                   end
 
                   it 'should state the file saved' do
-                     Lockbox.master_key = default_lockbox_key
-
-                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                     with_lockbox_key default_lockbox_key do
+                        expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                     end
                   end
 
                   it 'should clone the decrypted contents into the tempfile' do
-                     Lockbox.master_key = default_lockbox_key
-                     new_content        = '---'
-                     tmpfile            = double('tmpfile', path: '/tmp/whatever', read: new_content)
+                     with_lockbox_key default_lockbox_key do
+                        new_content = '---'
+                        tmpfile     = double('tmpfile', path: '/tmp/whatever', read: new_content)
 
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return new_content
+                        allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return new_content
 
-                     expect(tmpfile).to receive(:write).with("---\n")
-                     expect(tmpfile).to receive(:rewind)
+                        expect(tmpfile).to receive(:write).with("---\n")
+                        expect(tmpfile).to receive(:rewind)
 
-                     task.invoke
+                        task.invoke
+                     end
                   end
 
                   it 'should edit the secrets tmpfile' do
-                     Lockbox.master_key = default_lockbox_key
-                     tmpfile            = double('tmpfile', write: nil, rewind: nil, read: '---', path: '/tmp/whatever')
+                     with_lockbox_key default_lockbox_key do
+                        tmpfile = double('tmpfile', write: nil, rewind: nil, read: '---', path: '/tmp/whatever')
 
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
+                        allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
 
-                     # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
-                           .to receive(:system).with('editor', '/tmp/whatever', exception: true)
+                        # the intention of 'exception: true' is to noisily fail, which can be useful when automating
+                        expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
+                              .to receive(:system).with('editor', '/tmp/whatever', exception: true)
 
-                     task.invoke
+                        task.invoke
+                     end
                   end
 
                   it 'should update the encrypted file with new contents' do
-                     Lockbox.master_key = default_lockbox_key
-
                      new_contents = <<~YML
                         ---
                         password: mellon
                      YML
+
                      tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
                      allow(Tempfile).to receive(:create).and_yield tmpfile
 
-                     task.invoke
+                     with_lockbox_key default_lockbox_key do
+                        task.invoke
+                     end
 
                      lockbox = Lockbox.new(key: default_lockbox_key)
 
@@ -612,8 +610,6 @@ module Invar
                      custom_permissions = 0o640
                      secrets_path.chmod custom_permissions
 
-                     Lockbox.master_key = default_lockbox_key
-
                      new_contents = <<~YML
                         ---
                         password: mellon
@@ -621,7 +617,9 @@ module Invar
                      tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
                      allow(Tempfile).to receive(:create).and_yield tmpfile
 
-                     task.invoke
+                     with_lockbox_key default_lockbox_key do
+                        task.invoke
+                     end
 
                      lockbox = Lockbox.new(key: default_lockbox_key)
 
@@ -631,7 +629,7 @@ module Invar
                   end
 
                   context 'content provided in stdin pipe' do
-                     let(:input_string) do
+                     let :input_string do
                         <<~YML
                            ---
                            password: 'mellon'
@@ -639,8 +637,10 @@ module Invar
                      end
 
                      around(:each) do |example|
-                        with_pipe_input input_string do
-                           example.call
+                        with_lockbox_key default_lockbox_key do
+                           with_pipe_input input_string do
+                              example.call
+                           end
                         end
                      end
 
@@ -652,12 +652,11 @@ module Invar
                      end
 
                      it 'should use the provided content' do
-                        Lockbox.master_key = default_lockbox_key
-
                         task.invoke
 
-                        lockbox = Lockbox.new(key: default_lockbox_key)
-                        expect(lockbox.decrypt(secrets_path.read)).to eq input_string
+                        lockbox   = Lockbox.new key: default_lockbox_key
+                        decrypted = lockbox.decrypt secrets_path.read
+                        expect(decrypted).to eq input_string
                      end
                   end
                end
@@ -681,6 +680,7 @@ module Invar
                      YML
                   end
 
+                  # TODO: use climate control for this
                   around(:each) do |example|
                      old_home    = Dir.home
                      ENV['HOME'] = home.to_s
@@ -697,15 +697,8 @@ module Invar
                   end
 
                   context 'Lockbox master key is defined' do
-                     before(:each) do
-                        Lockbox.master_key = default_lockbox_key
-                     end
-
                      around(:each) do |example|
-                        old_key            = Lockbox.master_key
-                        Lockbox.master_key = default_lockbox_key
-                        example.run
-                        Lockbox.master_key = old_key
+                        with_lockbox_key(default_lockbox_key, &example)
                      end
 
                      it 'should NOT ask for it from STDIN' do
@@ -722,10 +715,7 @@ module Invar
 
                   context 'Lockbox master key is undefined' do
                      around(:each) do |example|
-                        old_key            = Lockbox.master_key
-                        Lockbox.master_key = nil
-                        example.run
-                        Lockbox.master_key = old_key
+                        with_lockbox_key(nil, &example)
                      end
 
                      context 'STDIN is TTY' do
@@ -776,9 +766,9 @@ module Invar
                   end
 
                   it 'should re-encrypt the file under the new key' do
-                     Lockbox.master_key = default_lockbox_key
-
-                     task.invoke
+                     with_lockbox_key default_lockbox_key do
+                        task.invoke
+                     end
 
                      lockbox = Lockbox.new(key: new_key)
 
@@ -786,33 +776,35 @@ module Invar
                   end
 
                   it 'should clean up the swap file' do
-                     Lockbox.master_key = default_lockbox_key
+                     with_lockbox_key default_lockbox_key do
+                        task.invoke
+                     end
 
-                     task.invoke
-
-                     expect(File).to_not exist("#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }")
+                     expect(File).to_not exist "#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }"
                   end
 
                   it 'should return the swap file when aborting' do
-                     Lockbox.master_key = default_lockbox_key
-
                      secrets_path.chmod 0o400 # read-only
-                     allow(File).to receive(:open) do
+                     allow(File).to receive :open do
                         raise Errno::ENOSPC, 'Dummy write failure'
                      end
-                     task.invoke
 
-                     expect(File).to_not exist("#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }")
-                     expect(File).to exist(secrets_path)
+                     with_lockbox_key default_lockbox_key do
+                        task.invoke
+                     end
 
-                     lockbox = Lockbox.new(key: default_lockbox_key)
-                     expect(lockbox.decrypt(secrets_path.read)).to eq secrets_content
+                     expect(File).to_not exist "#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }"
+                     expect(File).to exist secrets_path
+
+                     lockbox   = Lockbox.new key: default_lockbox_key
+                     decrypted = lockbox.decrypt secrets_path.read
+                     expect(decrypted).to eq secrets_content
                   end
 
                   it 'should state the updated file' do
-                     Lockbox.master_key = default_lockbox_key
-
-                     expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                     with_lockbox_key default_lockbox_key do
+                        expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
+                     end
                   end
                end
             end
