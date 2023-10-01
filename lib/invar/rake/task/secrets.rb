@@ -82,8 +82,7 @@ module Invar
                encrypted_data = lockbox.encrypt(content)
 
                config_dir.mkpath
-               # TODO: replace File.opens with photo_path.binwrite(uri.data) once FakeFS can handle it
-               File.open(file_path.to_s, 'wb') { |f| f.write encrypted_data }
+               file_path.binwrite encrypted_data
                file_path.chmod permissions if permissions
 
                warn "Saved file: #{ file_path }"

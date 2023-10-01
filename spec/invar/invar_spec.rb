@@ -7,31 +7,19 @@ describe Invar do
    let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
 
    let(:name) { 'my-app' }
-   let(:configs_dir) { Pathname.new('~/.config').expand_path / name }
+   let(:configs_dir) do
+      test_safe_path('~/.config') / name
+   end
    let(:config_path) { configs_dir / 'config.yml' }
    let(:secrets_path) { configs_dir / 'secrets.yml' }
    let(:key_path) { configs_dir / 'master_key' }
-
-   before :each do
-      gem_dir = Pathname.new(ENV.fetch('GEM_HOME')) / 'gems'
-
-      dry_gems = Bundler.locked_gems.specs.collect(&:full_name).select do |name|
-         name.start_with? 'dry-schema', 'dry-logic'
-      end
-
-      # need to clone dry gems because they seem to lazy load after FakeFS is engaged
-      # TODO: this will disappear if FakeFS is removed
-      dry_gems.each do |path|
-         FakeFS::FileSystem.clone(gem_dir / path)
-      end
-   end
 
    before(:each) do
       configs_dir.mkpath
 
       config_path.write '---'
       config_path.chmod 0o600
-      secrets_path.write lockbox.encrypt('---')
+      secrets_path.binwrite lockbox.encrypt '---'
       secrets_path.chmod 0o600
 
       key_path.write default_lockbox_key
@@ -43,7 +31,13 @@ describe Invar do
    end
 
    describe '.new' do
-      it 'should alias Invar::Invar.new' do
+      # TODO: use climate control for this
+      around :each do |example|
+         test_env = {'XDG_CONFIG_HOME' => test_safe_path('~/.config').to_s}
+         with_env test_env, &example
+      end
+
+      it 'should alias Invar::Reality.new' do
          expect(Invar.new(namespace: name)).to be_a Invar::Reality
       end
    end

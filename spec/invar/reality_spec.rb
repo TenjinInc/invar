@@ -13,41 +13,32 @@ module Invar
          YML
       end
 
-      let(:configs_dir) { Pathname.new('~/.config').expand_path / name }
+      let(:configs_dir) do
+         Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name
+      end
       let(:config_path) { configs_dir / 'config.yml' }
       let(:secrets_path) { configs_dir / 'secrets.yml' }
       let(:key_path) { configs_dir / 'master_key' }
 
-      before :each do
-         gem_dir = Pathname.new(ENV.fetch('GEM_HOME')) / 'gems'
-
-         dry_gems = Bundler.locked_gems.specs.collect(&:full_name).select do |name|
-            name.start_with? 'dry-schema', 'dry-logic'
-         end
-
-         # need to clone dry gems because they seem to lazy load after FakeFS is engaged
-         # TODO: this will disappear if FakeFS is removed
-         dry_gems.each do |path|
-            FakeFS::FileSystem.clone(gem_dir / path)
-         end
-      end
-
       before(:each) do
          configs_dir.mkpath
 
-         config_path.write '---'
+         config_path.write clear_yaml
          config_path.chmod 0o600
-         secrets_path.write lockbox.encrypt('---')
-         config_path.chmod 0o600
+         secrets_path.binwrite lockbox.encrypt(clear_yaml)
+         secrets_path.chmod 0o600
 
          key_path.write default_lockbox_key
          key_path.chmod 0o600
       end
 
+      let(:fake_home) { test_safe_path '/home/someone' }
+
       describe '#initialize' do
-         let(:configs_dir) { Pathname.new('~/.config').expand_path / name }
-         let(:config_path) { configs_dir / 'config.yml' }
-         let(:secrets_path) { configs_dir / 'secrets.yml' }
+         # TODO: use climate control for this
+         around :each do |example|
+            with_env('HOME' => fake_home.to_s, &example)
+         end
 
          it 'should explode when namespace missing' do
             expect { described_class.new }.to raise_error ArgumentError, 'missing keyword: :namespace'
@@ -61,7 +52,7 @@ module Invar
 
             config_path.write clear_yaml
             config_path.chmod 0o600
-            secrets_path.write lockbox.encrypt clear_yaml
+            secrets_path.binwrite lockbox.encrypt clear_yaml
             secrets_path.chmod 0o600
 
             key_file = configs_dir / 'master_key'
@@ -95,7 +86,7 @@ module Invar
 
                config_path.write clear_yaml
                config_path.chmod 0o600
-               secrets_path.write lockbox.encrypt clear_yaml
+               secrets_path.binwrite lockbox.encrypt clear_yaml
                secrets_path.chmod 0o600
 
                key_file = configs_dir / 'master_key'
@@ -122,7 +113,7 @@ module Invar
 
             it 'should explode when there are unexpected keys in secrets' do
                # testing both nested and root keys
-               secrets_path.write lockbox.encrypt <<~YML
+               secrets_path.binwrite lockbox.encrypt <<~YML
                   ---
                   took: 'fool'
                   database:
@@ -175,15 +166,23 @@ module Invar
                end
 
                it 'should state the locations searched' do
-                  xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)) / name
+                  xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)).expand_path
+                  xdg_config_dirs = %w[/something /someplace].collect { |p| test_safe_path p }
 
-                  xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', '/something:/someplace')
-                  xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
+                  test_env = {
+                        'XDG_CONFIG_HOME' => xdg_config_home.to_s,
+                        'XDG_CONFIG_DIRS' => xdg_config_dirs.join(':')
+                  }
 
-                  expect do
-                     described_class.new namespace: name
-                  end.to raise_error MissingConfigFileError, include(xdg_config_home.expand_path.to_s)
-                                                                   .and(include(xdg_config_dirs.join(', ')))
+                  # TODO: use climate control for this
+                  with_env test_env do
+                     expected_dirs = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
+
+                     expect do
+                        described_class.new namespace: name
+                     end.to raise_error MissingConfigFileError, include((xdg_config_home / name).to_s)
+                                                                      .and(include(expected_dirs.join(', ')))
+                  end
                end
             end
          end
@@ -221,31 +220,34 @@ module Invar
                end
 
                it ' should state the locations searched ' do
-                  xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)) / name
+                  xdg_config_home = Pathname.new(ENV.fetch('XDG_CONFIG_HOME', XDG::Defaults::CONFIG_HOME)).expand_path
+                  xdg_config_dirs = %w[/something /someplace/else].collect { |p| test_safe_path p }
 
-                  xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', '/something:/someplace')
-                  xdg_config_dirs = xdg_config_dirs.split(':').collect { |p| Pathname.new(p) / name }
+                  test_env = {
+                        'XDG_CONFIG_HOME' => xdg_config_home.to_s,
+                        'XDG_CONFIG_DIRS' => xdg_config_dirs.join(':')
+                  }
 
-                  expect do
-                     described_class.new namespace: name
-                  end.to raise_error MissingSecretsFileError, include(xdg_config_home.expand_path.to_s)
-                                                                    .and(include(xdg_config_dirs.join(', ')))
+                  # TODO: use climate control for this
+                  with_env test_env do
+                     expected_dirs = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
+
+                     expect do
+                        described_class.new namespace: name
+                     end.to raise_error MissingSecretsFileError, include((xdg_config_home / name).to_s)
+                                                                       .and(include(expected_dirs.join(', ')))
+                  end
                end
             end
 
             context 'encryption key defined' do
-               let(:name) { 'test-app' }
-
-               let(:configs_dir) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / name }
-               let(:secrets_path) { configs_dir / 'secrets.yml' }
-
                before(:each) do
                   config_path = configs_dir / 'config.yml'
                   config_path.dirname.mkpath
                   config_path.write clear_yaml
                   config_path.chmod(0o600)
 
-                  secrets_path.write lockbox.encrypt clear_yaml
+                  secrets_path.binwrite lockbox.encrypt clear_yaml
                   secrets_path.chmod(0o600)
                end
 
@@ -342,15 +344,22 @@ module Invar
                   it 'should have a useful error message' do
                      msg = "Could not find file '#{ Reality::DEFAULT_KEY_FILE_NAME }'."
 
-                     # TODO: Would be better to control the XDG env vars here once something like Climate Control is added
-                     search_paths = [XDG::Defaults::CONFIG_HOME]
-                     search_paths = (search_paths + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
-                        Pathname.new(p).expand_path / name
-                     end.join(', ')
+                     test_env = {
+                           'XDG_CONFIG_DIRS' => %w[/something /some/other/place].join(':')
+                     }
 
-                     expect do
-                        described_class.new namespace: name
-                     end.to raise_error SecretsFileDecryptionError, include(msg).and(include(search_paths))
+                     search_paths = [XDG::Defaults::CONFIG_HOME]
+
+                     # TODO: use climate control for this
+                     with_env test_env do
+                        search_paths = (search_paths + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
+                           Pathname.new(p).expand_path / name
+                        end.join(', ')
+
+                        expect do
+                           described_class.new namespace: name
+                        end.to raise_error SecretsFileDecryptionError, include(msg).and(include(search_paths))
+                     end
                   end
                end
             end
@@ -399,21 +408,18 @@ module Invar
                                 configs_schema: configs_schema,
                                 secrets_schema: secrets_schema
          end
-         let(:configs_dir) { Pathname.new('~/.config/test-app').expand_path }
          let(:key_path) { configs_dir / 'master_key' }
-         let(:configs_path) { configs_dir / 'config.yml' }
-         let(:secrets_path) { configs_dir / 'secrets.yml' }
 
          before :each do
-            configs_path.dirname.mkpath
-            configs_path.write <<~YML
+            config_path.dirname.mkpath
+            config_path.write <<~YML
                ---
                location: 'Moria'
             YML
-            configs_path.chmod 0o600
+            config_path.chmod 0o600
 
             secrets_path.dirname.mkpath
-            secrets_path.write lockbox.encrypt <<~YML
+            secrets_path.binwrite lockbox.encrypt <<~YML
                ---
                pass: 'mellon'
             YML
@@ -421,6 +427,13 @@ module Invar
 
             key_path.write default_lockbox_key
             key_path.chmod 0o600
+         end
+
+         # TODO: use climate control for this
+         around :each do |example|
+            with_env('HOME' => fake_home.to_s) do
+               example.run
+            end
          end
 
          it 'should have a :config base scope' do
@@ -477,10 +490,9 @@ module Invar
          context 'ENV configs' do
             let(:value) { 'some value' }
 
-            around(:each) do |example|
-               ENV['TEST_CONFIG'] = value
-               example.run
-               ENV['TEST_CONFIG'] = nil
+            # TODO: use climate control for this
+            around :each do |example|
+               with_env('TEST_CONFIG' => value, &example)
             end
 
             it 'should fetch configs from ENV' do
@@ -498,7 +510,7 @@ module Invar
             it 'should explode if there are collisions with ENV' do
                # testing both uppercase collisions and lowercase collisions
                %w[test_config TEST_CONFIG].each do |key|
-                  configs_path.write <<~YML
+                  config_path.write <<~YML
                      ---
                      #{ key }: 'something'
                   YML

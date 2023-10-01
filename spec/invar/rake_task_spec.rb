@@ -68,9 +68,19 @@ module Invar
                end
 
                context '$HOME is defined' do
-                  let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+                  let(:configs_dir) do
+                     Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name
+                  end
                   let(:config_path) { configs_dir / 'config.yml' }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
+
+                  # TODO: use climate control for this
+                  around :each do |example|
+                     test_env = {'HOME' => test_safe_path('/home/somebody').to_s}
+                     with_env test_env do
+                        example.run
+                     end
+                  end
 
                   it 'should create a config file in the XDG_CONFIG_HOME path' do
                      task.invoke
@@ -206,11 +216,14 @@ module Invar
                   let(:config_path) { configs_dir / 'config.yml' }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-                  around(:each) do |example|
-                     old_home = Dir.home
-                     ENV.delete('HOME')
-                     example.run
-                     ENV['HOME'] = old_home
+                  # TODO: use climate control for this
+                  around :each do |example|
+                     test_env = {'XDG_CONFIG_DIRS' => test_safe_path(Invar::XDG::Defaults::CONFIG_DIRS).to_s,
+                                 'HOME'            => nil}
+                     with_env test_env do
+                        ENV.delete('HOME')
+                        example.run
+                     end
                   end
 
                   it 'should create a config file in the first XDG_CONFIG_DIRS path' do
@@ -315,6 +328,22 @@ module Invar
             context 'invar:configs' do
                let(:task) { ::Rake::Task['invar:configs'] }
 
+               let(:fake_home) { test_safe_path '/home/somebody' }
+
+               let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+               let(:config_path) { configs_dir / 'config.yml' }
+
+               # TODO: use climate control for this
+               around :each do |example|
+                  test_env = {'HOME' => fake_home&.to_s}
+                  with_env test_env do
+                     configs_dir.mkpath
+                     config_path.write ''
+
+                     example.run
+                  end
+               end
+
                it 'should define a configs edit task' do
                   expect(::Rake::Task.task_defined?('invar:configs')).to be true
                end
@@ -323,65 +352,58 @@ module Invar
                   expect(::Rake::Task.task_defined?('invar:config')).to be true
                end
 
-               context '$HOME is defined' do
-                  let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
-                  let(:config_path) { configs_dir / 'config.yml' }
+               it 'should edit the config file in the XDG_CONFIG_HOME path' do
+                  # the intention of 'exception: true' is to noisily fail, which can be useful when automating
+                  expect_any_instance_of(Invar::Rake::Task::ConfigFileHandler)
+                        .to receive(:system).with('editor', config_path.to_s, exception: true)
 
-                  before(:each) do
-                     configs_dir.mkpath
-                     config_path.write ''
-                  end
+                  task.invoke
+               end
 
-                  it 'should edit the config file in the XDG_CONFIG_HOME path' do
-                     # the intention of 'exception: true' is to noisily fail, which can be useful when automating
-                     expect_any_instance_of(Invar::Rake::Task::ConfigFileHandler)
-                           .to receive(:system).with('editor', config_path.to_s, exception: true)
+               it 'should abort if the file does not exist' do
+                  config_path.delete
 
-                     task.invoke
-                  end
+                  xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+                  xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-                  it 'should abort if the file does not exist' do
-                     config_path.delete
+                  search_path = [Pathname.new(xdg_home).expand_path / name]
+                                      .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
 
-                     xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
-                     xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
+                  msg = <<~MSG
+                     Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
+                     #{ Invar::Rake::Task::CREATE_SUGGESTION }
+                  MSG
 
-                     search_path = [Pathname.new(xdg_home).expand_path / name]
-                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+                  expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+               end
 
-                     msg = <<~MSG
-                        Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
-                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
-                     MSG
+               it 'should state the file saved' do
+                  config_path = configs_dir / 'config.yml'
 
-                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
-                  end
-
-                  it 'should state the file saved' do
-                     config_path = configs_dir / 'config.yml'
-
-                     expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
-                  end
+                  expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
                end
 
                context '$HOME is undefined' do
                   let(:search_path) do
                      ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
-                        Pathname.new(p) / name
+                        test_safe_path(p)
                      end
                   end
-                  let(:config_path) { search_path.first / 'config.yml' }
+                  let(:configs_dir) { search_path.first / name }
+                  let(:config_path) { configs_dir / 'config.yml' }
 
-                  before(:each) do
-                     search_path.each(&:mkpath)
-                     config_path.write ''
-                  end
+                  let(:fake_home) { nil }
 
-                  around(:each) do |example|
-                     old_home = Dir.home
-                     ENV.delete('HOME')
-                     example.run
-                     ENV['HOME'] = old_home
+                  # TODO: use climate control for this
+                  around :each do |example|
+                     test_env = {'XDG_CONFIG_DIRS' => search_path.join(':')}
+                     with_env test_env do
+                        search_path.each(&:mkpath)
+                        config_path.write ''
+
+                        ENV.delete('HOME')
+                        example.run
+                     end
                   end
 
                   it 'should edit the config file in the first XDG_CONFIG_DIRS path' do
@@ -395,8 +417,10 @@ module Invar
                   it 'should abort if the file does not exist' do
                      config_path.delete
 
+                     expected_search_locations = search_path.collect { |path| path / name }
+
                      msg = <<~MSG
-                        Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
+                        Abort: Could not find #{ config_path.basename }. Searched in: #{ expected_search_locations.join(', ') }
                         #{ Invar::Rake::Task::CREATE_SUGGESTION }
                      MSG
 
@@ -468,18 +492,19 @@ module Invar
                   let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-                  around(:each) do |example|
-                     old_home    = Dir.home
-                     ENV['HOME'] = home.to_s
-                     example.run
-                     ENV['HOME'] = old_home
+                  # TODO: use climate control for this
+                  around :each do |example|
+                     test_env = {'HOME' => test_safe_path('/home/somebody').to_s}
+                     with_env test_env do
+                        example.run
+                     end
                   end
 
                   before(:each) do
                      configs_dir.mkpath
                      lockbox = Lockbox.new(key: default_lockbox_key)
 
-                     secrets_path.write lockbox.encrypt <<~YML
+                     secrets_path.binwrite lockbox.encrypt <<~YML
                         ---
                      YML
                      secrets_path.chmod(0o600)
@@ -670,7 +695,7 @@ module Invar
                end
 
                context '$HOME is defined' do
-                  let(:home) { '/some/home/dir' }
+                  let(:fake_home) { test_safe_path('/home/somebody') }
                   let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
                   let(:secrets_content) do
@@ -681,18 +706,18 @@ module Invar
                   end
 
                   # TODO: use climate control for this
-                  around(:each) do |example|
-                     old_home    = Dir.home
-                     ENV['HOME'] = home.to_s
-                     example.run
-                     ENV['HOME'] = old_home
+                  around :each do |example|
+                     test_env = {'HOME' => fake_home.to_s}
+                     with_env test_env do
+                        example.run
+                     end
                   end
 
                   before(:each) do
                      configs_dir.mkpath
                      lockbox = Lockbox.new(key: default_lockbox_key)
 
-                     secrets_path.write lockbox.encrypt(secrets_content)
+                     secrets_path.binwrite lockbox.encrypt secrets_content
                      secrets_path.chmod 0o600
                   end
 
@@ -785,20 +810,20 @@ module Invar
 
                   it 'should return the swap file when aborting' do
                      secrets_path.chmod 0o400 # read-only
-                     allow(File).to receive :open do
+                     allow_any_instance_of(Pathname).to receive :binwrite do
                         raise Errno::ENOSPC, 'Dummy write failure'
                      end
 
                      with_lockbox_key default_lockbox_key do
                         task.invoke
+
+                        expect(File).to_not exist "#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }"
+                        expect(File).to exist secrets_path
+
+                        lockbox   = Lockbox.new key: default_lockbox_key
+                        decrypted = lockbox.decrypt secrets_path.binread
+                        expect(decrypted).to eq secrets_content
                      end
-
-                     expect(File).to_not exist "#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }"
-                     expect(File).to exist secrets_path
-
-                     lockbox   = Lockbox.new key: default_lockbox_key
-                     decrypted = lockbox.decrypt secrets_path.read
-                     expect(decrypted).to eq secrets_content
                   end
 
                   it 'should state the updated file' do

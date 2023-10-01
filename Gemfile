@@ -14,7 +14,6 @@ group :development do
 end
 
 group :test do
-   gem 'fakefs', '~> 2.5'
    gem 'rspec', '~> 3.12'
    gem 'simplecov', '~> 0.22'
 end

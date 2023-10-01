@@ -8,13 +8,9 @@ $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
 require 'invar'
 
-# required to prevent "TypeError: superclass mismatch for class File" red herring when tests fail using FakeFS
-require 'pp'
-
-require 'fakefs/safe'
-require 'fakefs/spec_helpers'
-
 module SpecHelpers
+   TEST_TMP_ROOT = Pathname.new(Dir.mktmpdir('invar_test_')).expand_path.freeze
+
    # Runs the given block in a context where STDIN is connected to a pipe containing the given input string
    #
    # @param input_string - String to feed into the pipe
@@ -42,10 +38,36 @@ module SpecHelpers
       yield
       Lockbox.master_key = original_key
    end
+
+   def test_safe_path(original_path)
+      original_path = Pathname.new(original_path).expand_path
+
+      relative_path = original_path.absolute? ? original_path.relative_path_from('/') : original_path
+
+      SpecHelpers::TEST_TMP_ROOT / relative_path
+   end
+
+   def with_env(new_env)
+      old_env = {}
+      new_env.each do |key, value|
+         old_env[key] = ENV.fetch(key, nil)
+         ENV[key]     = value
+      end
+      yield
+      # reset
+      old_env.each do |key, value|
+         ENV[key] = value
+      end
+   end
+
+   def self.included(example_group)
+      # Wipe out the test files after each step
+      example_group.after :each do
+         TEST_TMP_ROOT.each_child(&:rmtree)
+      end
+   end
 end
 
 RSpec.configure do |config|
-   config.include FakeFS::SpecHelpers
-
    config.include SpecHelpers
 end

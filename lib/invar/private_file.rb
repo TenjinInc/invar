@@ -9,7 +9,8 @@ module Invar
    # Verifies a file is secure
    class PrivateFile
       extend Forwardable
-      def_delegators :@delegate_sd_obj, :stat, :to_s, :basename, :dirname, :extname, :==, :chmod, :rename, :write
+      def_delegators :@delegate_sd_obj,
+                     :stat, :to_s, :basename, :dirname, :extname, :==, :chmod, :rename, :write, :binwrite
 
       # Mask for limiting to the lowest three octal digits (which store permissions)
       PERMISSIONS_MASK = 0o777

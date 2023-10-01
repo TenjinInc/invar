@@ -9,19 +9,13 @@ module Invar
       describe '#initialize' do
          let(:locator) { described_class.new namespace }
 
-         around(:each) do |example|
-            # store original values
-            old_xdg_config_home = ENV.fetch('XDG_CONFIG_HOME', nil)
-            old_xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', nil)
-
-            # actual test setup
-            ENV.delete('XDG_CONFIG_HOME')
-            ENV.delete('XDG_CONFIG_DIRS')
-            example.run
-
-            # reset original values
-            ENV['XDG_CONFIG_HOME'] = old_xdg_config_home
-            ENV['XDG_CONFIG_DIRS'] = old_xdg_config_dirs
+         # TODO: use climate control for this
+         around :each do |example|
+            with_env({}) do
+               ENV.delete('XDG_CONFIG_HOME')
+               ENV.delete('XDG_CONFIG_DIRS')
+               example.run
+            end
          end
 
          it 'should explode when provided an empty namespace' do
@@ -52,20 +46,20 @@ module Invar
          end
 
          context '$HOME is defined' do
-            let(:home) { Pathname.new '/some/home/path' }
+            let(:home) { test_safe_path '/some/home/path' }
 
-            around(:each) do |example|
-               old_home    = Dir.home
-               ENV['HOME'] = home.to_s
-               example.run
-               ENV['HOME'] = old_home
+            # TODO: use climate control for this
+            around :each do |example|
+               test_env = {'HOME' => home.to_s}
+               with_env test_env, &example
             end
 
             it 'should search in XDG_CONFIG_HOME' do
-               config_root            = Pathname.new '/an_alternate/home-config/path'
-               ENV['XDG_CONFIG_HOME'] = config_root.to_s
+               config_root = test_safe_path '/an_alternate/home-config/path'
 
-               expect(locator.search_paths).to start_with(config_root / namespace)
+               with_env('XDG_CONFIG_HOME' => config_root.to_s) do
+                  expect(locator.search_paths).to start_with(config_root / namespace)
+               end
             end
 
             # Standard defines default as "$HOME/.config"
@@ -78,21 +72,24 @@ module Invar
          end
 
          context '$HOME is undefined' do
-            around(:each) do |example|
-               old_home = Dir.home
-               ENV.delete('HOME')
-               example.run
-               ENV['HOME'] = old_home
+            # TODO: use climate control for this
+            around :each do |example|
+               test_env = {'HOME' => nil}
+               with_env test_env do
+                  ENV.delete 'HOME'
+                  example.run
+               end
             end
 
             # Config dirs are a colon-separated priority list
             it 'should search in any XDG_CONFIG_DIRS directory' do
-               config_dirs            = %w[/an_alternate/home /config/path]
-               ENV['XDG_CONFIG_DIRS'] = config_dirs.join(':')
+               config_dirs = %w[/an_alternate/home /config/path]
 
-               expect(locator.search_paths.length).to eq 2
-               expect(locator.search_paths.first).to eq Pathname.new(config_dirs.first) / namespace
-               expect(locator.search_paths.last).to eq Pathname.new(config_dirs.last) / namespace
+               with_env('XDG_CONFIG_DIRS' => config_dirs.join(':')) do
+                  expect(locator.search_paths.length).to eq 2
+                  expect(locator.search_paths.first).to eq Pathname.new(config_dirs.first) / namespace
+                  expect(locator.search_paths.last).to eq Pathname.new(config_dirs.last) / namespace
+               end
             end
 
             # Standard defines default as "/etc/xdg"
@@ -109,12 +106,21 @@ module Invar
       describe '#find' do
          let(:locator) { described_class.new namespace }
          let(:filename) { 'some-file.yml' }
-         let(:file_path) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / namespace / filename }
+         let(:file_path) do
+            test_safe_path(XDG::Defaults::CONFIG_HOME) / namespace / filename
+         end
 
-         context 'file is found' do
+         context 'file exists' do
             before(:each) do
                file_path.dirname.mkpath
                file_path.write ''
+            end
+
+            # TODO: use climate control for this
+            around :each do |example|
+               test_env = {'XDG_CONFIG_HOME' => test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
+                           'XDG_CONFIG_DIRS' => test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s}
+               with_env test_env, &example
             end
 
             it 'should return a path to the file' do
@@ -122,7 +128,7 @@ module Invar
             end
          end
 
-         context 'file cannot be found' do
+         context 'file does NOT exist' do
             it 'should explode' do
                expect do
                   locator.find 'bogus.yml'
@@ -130,12 +136,16 @@ module Invar
             end
          end
 
-         # This situation can be very confusing when you end up with multiple copies of the same file across
+         # Motivation: This situation can be very confusing when you end up with multiple copies of the same file across
          # locations and you think you're editing the right one. The feature attempts to prevent that error.
-         context 'multiple files are found' do
+         context 'matching files exist in multiple locations' do
             let(:filename) { 'config.yml' }
-            let(:path_a) { Pathname.new(XDG::Defaults::CONFIG_HOME).expand_path / namespace / filename }
-            let(:path_b) { Pathname.new(XDG::Defaults::CONFIG_DIRS) / namespace / filename }
+            let(:path_a) do
+               test_safe_path(XDG::Defaults::CONFIG_HOME) / namespace / filename
+            end
+            let(:path_b) do
+               test_safe_path(XDG::Defaults::CONFIG_DIRS) / namespace / filename
+            end
 
             before(:each) do
                path_a.dirname.mkpath
@@ -143,6 +153,13 @@ module Invar
 
                path_a.write 'file a'
                path_b.write 'file b'
+            end
+
+            # TODO: use climate control for this
+            around :each do |example|
+               test_env = {'XDG_CONFIG_HOME' => test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
+                           'XDG_CONFIG_DIRS' => test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s}
+               with_env test_env, &example
             end
 
             it 'should explode' do
