@@ -8,6 +8,8 @@ $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
 require 'invar'
 
+require 'climate_control'
+
 module SpecHelpers
    TEST_TMP_ROOT = Pathname.new(Dir.mktmpdir('invar_test_')).expand_path.freeze
 
@@ -45,19 +47,6 @@ module SpecHelpers
       relative_path = original_path.absolute? ? original_path.relative_path_from('/') : original_path
 
       SpecHelpers::TEST_TMP_ROOT / relative_path
-   end
-
-   def with_env(new_env)
-      old_env = {}
-      new_env.each do |key, value|
-         old_env[key] = ENV.fetch(key, nil)
-         ENV[key]     = value
-      end
-      yield
-      # reset
-      old_env.each do |key, value|
-         ENV[key] = value
-      end
    end
 
    def self.included(example_group)

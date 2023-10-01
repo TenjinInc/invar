@@ -74,10 +74,8 @@ module Invar
                   let(:config_path) { configs_dir / 'config.yml' }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-                  # TODO: use climate control for this
                   around :each do |example|
-                     test_env = {'HOME' => test_safe_path('/home/somebody').to_s}
-                     with_env test_env do
+                     ClimateControl.modify('HOME' => test_safe_path('/home/somebody').to_s) do
                         example.run
                      end
                   end
@@ -216,11 +214,10 @@ module Invar
                   let(:config_path) { configs_dir / 'config.yml' }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-                  # TODO: use climate control for this
                   around :each do |example|
-                     test_env = {'XDG_CONFIG_DIRS' => test_safe_path(Invar::XDG::Defaults::CONFIG_DIRS).to_s,
-                                 'HOME'            => nil}
-                     with_env test_env do
+                     # setting home to nil is required for CC to track and reset the change
+                     ClimateControl.modify(XDG_CONFIG_DIRS: test_safe_path(Invar::XDG::Defaults::CONFIG_DIRS).to_s,
+                                           HOME:            nil) do
                         ENV.delete('HOME')
                         example.run
                      end
@@ -333,10 +330,8 @@ module Invar
                let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                let(:config_path) { configs_dir / 'config.yml' }
 
-               # TODO: use climate control for this
                around :each do |example|
-                  test_env = {'HOME' => fake_home&.to_s}
-                  with_env test_env do
+                  ClimateControl.modify HOME: fake_home&.to_s do
                      configs_dir.mkpath
                      config_path.write ''
 
@@ -394,10 +389,8 @@ module Invar
 
                   let(:fake_home) { nil }
 
-                  # TODO: use climate control for this
                   around :each do |example|
-                     test_env = {'XDG_CONFIG_DIRS' => search_path.join(':')}
-                     with_env test_env do
+                     ClimateControl.modify XDG_CONFIG_DIRS: search_path.join(':') do
                         search_path.each(&:mkpath)
                         config_path.write ''
 
@@ -492,10 +485,8 @@ module Invar
                   let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
                   let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-                  # TODO: use climate control for this
                   around :each do |example|
-                     test_env = {'HOME' => test_safe_path('/home/somebody').to_s}
-                     with_env test_env do
+                     ClimateControl.modify HOME: test_safe_path('/home/somebody').to_s do
                         example.run
                      end
                   end
@@ -705,10 +696,8 @@ module Invar
                      YML
                   end
 
-                  # TODO: use climate control for this
                   around :each do |example|
-                     test_env = {'HOME' => fake_home.to_s}
-                     with_env test_env do
+                     ClimateControl.modify HOME: fake_home.to_s do
                         example.run
                      end
                   end

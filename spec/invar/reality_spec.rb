@@ -35,9 +35,8 @@ module Invar
       let(:fake_home) { test_safe_path '/home/someone' }
 
       describe '#initialize' do
-         # TODO: use climate control for this
          around :each do |example|
-            with_env('HOME' => fake_home.to_s, &example)
+            ClimateControl.modify('HOME' => fake_home.to_s, &example)
          end
 
          it 'should explode when namespace missing' do
@@ -174,8 +173,7 @@ module Invar
                         'XDG_CONFIG_DIRS' => xdg_config_dirs.join(':')
                   }
 
-                  # TODO: use climate control for this
-                  with_env test_env do
+                  ClimateControl.modify test_env do
                      expected_dirs = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
 
                      expect do
@@ -228,8 +226,7 @@ module Invar
                         'XDG_CONFIG_DIRS' => xdg_config_dirs.join(':')
                   }
 
-                  # TODO: use climate control for this
-                  with_env test_env do
+                  ClimateControl.modify test_env do
                      expected_dirs = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
 
                      expect do
@@ -350,8 +347,7 @@ module Invar
 
                      search_paths = [XDG::Defaults::CONFIG_HOME]
 
-                     # TODO: use climate control for this
-                     with_env test_env do
+                     ClimateControl.modify test_env do
                         search_paths = (search_paths + ENV.fetch('XDG_CONFIG_DIRS').split(':')).collect do |p|
                            Pathname.new(p).expand_path / name
                         end.join(', ')
@@ -429,9 +425,8 @@ module Invar
             key_path.chmod 0o600
          end
 
-         # TODO: use climate control for this
          around :each do |example|
-            with_env('HOME' => fake_home.to_s) do
+            ClimateControl.modify('HOME' => fake_home.to_s) do
                example.run
             end
          end
@@ -490,9 +485,8 @@ module Invar
          context 'ENV configs' do
             let(:value) { 'some value' }
 
-            # TODO: use climate control for this
             around :each do |example|
-               with_env('TEST_CONFIG' => value, &example)
+               ClimateControl.modify('TEST_CONFIG' => value, &example)
             end
 
             it 'should fetch configs from ENV' do

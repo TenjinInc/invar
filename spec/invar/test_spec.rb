@@ -175,9 +175,8 @@ describe 'Invar test extension' do
 
          let(:fake_home) { test_safe_path '/home/someone' }
 
-         # TODO: use climate control for this
          around :each do |example|
-            with_env('HOME' => fake_home.to_s) do
+            ClimateControl.modify('HOME' => fake_home.to_s) do
                example.run
             end
          end

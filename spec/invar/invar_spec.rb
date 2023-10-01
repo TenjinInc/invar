@@ -31,10 +31,9 @@ describe Invar do
    end
 
    describe '.new' do
-      # TODO: use climate control for this
       around :each do |example|
          test_env = {'XDG_CONFIG_HOME' => test_safe_path('~/.config').to_s}
-         with_env test_env, &example
+         ClimateControl.modify test_env, &example
       end
 
       it 'should alias Invar::Reality.new' do

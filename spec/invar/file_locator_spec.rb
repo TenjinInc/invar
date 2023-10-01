@@ -9,9 +9,8 @@ module Invar
       describe '#initialize' do
          let(:locator) { described_class.new namespace }
 
-         # TODO: use climate control for this
          around :each do |example|
-            with_env({}) do
+            ClimateControl.modify({}) do
                ENV.delete('XDG_CONFIG_HOME')
                ENV.delete('XDG_CONFIG_DIRS')
                example.run
@@ -48,16 +47,14 @@ module Invar
          context '$HOME is defined' do
             let(:home) { test_safe_path '/some/home/path' }
 
-            # TODO: use climate control for this
             around :each do |example|
-               test_env = {'HOME' => home.to_s}
-               with_env test_env, &example
+               ClimateControl.modify HOME: home.to_s, &example
             end
 
             it 'should search in XDG_CONFIG_HOME' do
                config_root = test_safe_path '/an_alternate/home-config/path'
 
-               with_env('XDG_CONFIG_HOME' => config_root.to_s) do
+               ClimateControl.modify('XDG_CONFIG_HOME' => config_root.to_s) do
                   expect(locator.search_paths).to start_with(config_root / namespace)
                end
             end
@@ -72,10 +69,8 @@ module Invar
          end
 
          context '$HOME is undefined' do
-            # TODO: use climate control for this
             around :each do |example|
-               test_env = {'HOME' => nil}
-               with_env test_env do
+               ClimateControl.modify HOME: nil do
                   ENV.delete 'HOME'
                   example.run
                end
@@ -85,7 +80,7 @@ module Invar
             it 'should search in any XDG_CONFIG_DIRS directory' do
                config_dirs = %w[/an_alternate/home /config/path]
 
-               with_env('XDG_CONFIG_DIRS' => config_dirs.join(':')) do
+               ClimateControl.modify('XDG_CONFIG_DIRS' => config_dirs.join(':')) do
                   expect(locator.search_paths.length).to eq 2
                   expect(locator.search_paths.first).to eq Pathname.new(config_dirs.first) / namespace
                   expect(locator.search_paths.last).to eq Pathname.new(config_dirs.last) / namespace
@@ -116,11 +111,11 @@ module Invar
                file_path.write ''
             end
 
-            # TODO: use climate control for this
             around :each do |example|
-               test_env = {'XDG_CONFIG_HOME' => test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
-                           'XDG_CONFIG_DIRS' => test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s}
-               with_env test_env, &example
+               ClimateControl.modify XDG_CONFIG_HOME: test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
+                                     XDG_CONFIG_DIRS: test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s do
+                  example.run
+               end
             end
 
             it 'should return a path to the file' do
@@ -155,11 +150,10 @@ module Invar
                path_b.write 'file b'
             end
 
-            # TODO: use climate control for this
             around :each do |example|
                test_env = {'XDG_CONFIG_HOME' => test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
                            'XDG_CONFIG_DIRS' => test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s}
-               with_env test_env, &example
+               ClimateControl.modify test_env, &example
             end
 
             it 'should explode' do
