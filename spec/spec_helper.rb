@@ -15,25 +15,31 @@ require 'fakefs/safe'
 require 'fakefs/spec_helpers'
 
 module SpecHelpers
+   # Runs the given block in a context where STDIN is connected to a pipe containing the given input string
+   #
+   # @param input_string - String to feed into the pipe
+   # @yield - context to run under the piped connection
    def with_pipe_input(input_string)
       original_stdin = $stdin
 
       IO.pipe do |reader, writer|
          $stdin = reader
          writer.puts input_string
-         writer.close # signal that input is totes dunzo
+         writer.close # signal that the input is totes dunzo
          yield
       end
 
       $stdin = original_stdin
    end
 
+   # Runs the given block with the specified `Lockbox.master_key`
+   #
+   # @param key - The key to feed to Lockbox
    def with_lockbox_key(key)
       original_key = Lockbox.master_key
 
       Lockbox.master_key = key
       yield
-
       Lockbox.master_key = original_key
    end
 end
