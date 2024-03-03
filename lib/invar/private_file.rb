@@ -3,7 +3,7 @@
 require 'invar/version'
 require 'invar/scope'
 
-require 'delegate'
+require 'forwardable'
 
 module Invar
    # Verifies a file is secure

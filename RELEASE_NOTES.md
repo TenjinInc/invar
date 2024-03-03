@@ -19,6 +19,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * none
 
+## [0.9.2] - 2024-03-03
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
+* none
+
+### Bugfixes
+
+* Fixed load error in ruby 3.3 of not properly requiring Forwardable
+
 ## [0.9.1] - 2023-09-30
 
 ### Major Changes
