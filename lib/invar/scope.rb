@@ -4,7 +4,7 @@ module Invar
    # A set of configurations
    class Scope
       def initialize(data = nil)
-         @data = convert(data)
+         @data = convert data
 
          @data.freeze
          freeze
@@ -34,7 +34,7 @@ module Invar
       def respond_to_missing?(method_name, include_all)
          guard_test_methods method_name
 
-         super method_name, include_all
+         super(method_name, include_all)
       end
 
       # Returns a hash representation of this scope and subscopes.

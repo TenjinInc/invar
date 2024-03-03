@@ -28,7 +28,7 @@ module Invar
       def respond_to_missing?(method_name, include_all)
          guard_test_hooks method_name
 
-         super method_name, include_all
+         super(method_name, include_all)
       end
 
       private
