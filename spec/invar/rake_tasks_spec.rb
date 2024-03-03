@@ -9,12 +9,11 @@ module Invar
    module Rake
       describe 'Rake Tasks Macro' do
          let(:name) { 'test-app' }
-         let(:default_lockbox_key) { '0' * 64 }
 
-         context '.define' do
+         describe '.define' do
             it 'should create an instance and call #define on it' do
                instance = double('tasks instance')
-               expect(Invar::Rake::Tasks).to receive(:new).and_return instance
+               allow(Invar::Rake::Tasks).to receive(:new).and_return instance
 
                expect(instance).to receive(:define)
 

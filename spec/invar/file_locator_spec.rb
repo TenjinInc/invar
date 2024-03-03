@@ -9,7 +9,7 @@ module Invar
       describe '#initialize' do
          let(:locator) { described_class.new namespace }
 
-         around :each do |example|
+         around do |example|
             ClimateControl.modify({}) do
                ENV.delete('XDG_CONFIG_HOME')
                ENV.delete('XDG_CONFIG_DIRS')
@@ -20,13 +20,13 @@ module Invar
          it 'should explode when provided an empty namespace' do
             expect do
                described_class.new ''
-            end.to raise_error FileLocator::InvalidNamespaceError, 'namespace cannot be an empty string'
+            end.to raise_error described_class::InvalidNamespaceError, 'namespace cannot be an empty string'
          end
 
          it 'should explode when provided a nil namespace' do
             expect do
                described_class.new nil
-            end.to raise_error FileLocator::InvalidNamespaceError, 'namespace cannot be nil'
+            end.to raise_error described_class::InvalidNamespaceError, 'namespace cannot be nil'
          end
 
          # This is so that it does not change behaviour if env variables are changed after it is loaded.
@@ -44,10 +44,10 @@ module Invar
             end
          end
 
-         context '$HOME is defined' do
+         context 'when $HOME is defined' do
             let(:home) { test_safe_path '/some/home/path' }
 
-            around :each do |example|
+            around do |example|
                ClimateControl.modify HOME: home.to_s, &example
             end
 
@@ -68,8 +68,8 @@ module Invar
             end
          end
 
-         context '$HOME is undefined' do
-            around :each do |example|
+         context 'when $HOME is undefined' do
+            around do |example|
                ClimateControl.modify HOME: nil do
                   ENV.delete 'HOME'
                   example.run
@@ -105,13 +105,13 @@ module Invar
             test_safe_path(XDG::Defaults::CONFIG_HOME) / namespace / filename
          end
 
-         context 'file exists' do
-            before(:each) do
+         context 'when file exists' do
+            before do
                file_path.dirname.mkpath
                file_path.write ''
             end
 
-            around :each do |example|
+            around do |example|
                ClimateControl.modify XDG_CONFIG_HOME: test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
                                      XDG_CONFIG_DIRS: test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s do
                   example.run
@@ -123,17 +123,17 @@ module Invar
             end
          end
 
-         context 'file does NOT exist' do
+         context 'when file does NOT exist' do
             it 'should explode' do
                expect do
                   locator.find 'bogus.yml'
-               end.to raise_error FileLocator::FileNotFoundError, 'Could not find bogus.yml'
+               end.to raise_error described_class::FileNotFoundError, 'Could not find bogus.yml'
             end
          end
 
          # Motivation: This situation can be very confusing when you end up with multiple copies of the same file across
          # locations and you think you're editing the right one. The feature attempts to prevent that error.
-         context 'matching files exist in multiple locations' do
+         context 'when matching files exist in multiple locations' do
             let(:filename) { 'config.yml' }
             let(:path_a) do
                test_safe_path(XDG::Defaults::CONFIG_HOME) / namespace / filename
@@ -142,7 +142,7 @@ module Invar
                test_safe_path(XDG::Defaults::CONFIG_DIRS) / namespace / filename
             end
 
-            before(:each) do
+            before do
                path_a.dirname.mkpath
                path_b.dirname.mkpath
 
@@ -150,7 +150,7 @@ module Invar
                path_b.write 'file b'
             end
 
-            around :each do |example|
+            around do |example|
                test_env = {'XDG_CONFIG_HOME' => test_safe_path(XDG::Defaults::CONFIG_HOME).to_s,
                            'XDG_CONFIG_DIRS' => test_safe_path(XDG::Defaults::CONFIG_DIRS).to_s}
                ClimateControl.modify test_env, &example

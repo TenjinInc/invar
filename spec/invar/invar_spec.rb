@@ -3,8 +3,7 @@
 require 'spec_helper'
 
 describe Invar do
-   let(:default_lockbox_key) { '0' * 64 }
-   let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
+   let(:lockbox) { Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY) }
 
    let(:name) { 'my-app' }
    let(:configs_dir) do
@@ -12,9 +11,8 @@ describe Invar do
    end
    let(:config_path) { configs_dir / 'config.yml' }
    let(:secrets_path) { configs_dir / 'secrets.yml' }
-   let(:key_path) { configs_dir / 'master_key' }
 
-   before(:each) do
+   before do
       configs_dir.mkpath
 
       config_path.write '---'
@@ -22,28 +20,30 @@ describe Invar do
       secrets_path.binwrite lockbox.encrypt '---'
       secrets_path.chmod 0o600
 
-      key_path.write default_lockbox_key
+      key_path = configs_dir / 'master_key'
+
+      key_path.write SpecHelpers::TEST_LOCKBOX_KEY
       key_path.chmod 0o600
    end
 
    it 'should have a version number' do
-      expect(Invar::VERSION).not_to be nil
+      expect(described_class::VERSION).not_to be_nil
    end
 
    describe '.new' do
-      around :each do |example|
+      around do |example|
          test_env = {'XDG_CONFIG_HOME' => test_safe_path('~/.config').to_s}
          ClimateControl.modify test_env, &example
       end
 
       it 'should alias Invar::Reality.new' do
-         expect(Invar.new(namespace: name)).to be_a Invar::Reality
+         expect(described_class.new(namespace: name)).to be_a described_class::Reality
       end
    end
 
    describe '.method_missing' do
       it 'should call super when not a testing method' do
-         expect { Invar.asdf }.to raise_error NoMethodError
+         expect { described_class.asdf }.to raise_error NoMethodError
       end
    end
 end

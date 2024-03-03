@@ -10,6 +10,8 @@ group :development do
    gem 'rake', '~> 13.1'
    gem 'rubocop', '~> 1.61'
    gem 'rubocop-performance', '~> 1.20'
+   gem 'rubocop-rake', '~> 0.6'
+   gem 'rubocop-rspec', '~> 2.27'
    gem 'yard', '~> 0.9'
 end
 

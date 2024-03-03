@@ -13,27 +13,33 @@ module Invar
          let(:group_mask) { 0o070 }
 
          it 'should allow user read only' do
-            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
+            user_modes = described_class::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
 
-            expect(user_modes).to eq [0o600, 0o400]
+            expect(user_modes).to include 0o400
          end
 
          it 'should allow user read write' do
-            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
+            user_modes = described_class::ALLOWED_MODES.collect { |m| m & user_mask }.uniq
 
-            expect(user_modes).to eq [0o600, 0o400]
+            expect(user_modes).to include 0o600
+         end
+
+         it 'should allow group no access' do
+            group_modes = described_class::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
+
+            expect(group_modes).to include 0o000
          end
 
          it 'should allow group read only' do
-            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
+            group_modes = described_class::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
 
-            expect(user_modes).to eq [0o060, 0o040, 0o000]
+            expect(group_modes).to include 0o040
          end
 
          it 'should allow group read write' do
-            user_modes = PrivateFile::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
+            group_modes = described_class::ALLOWED_MODES.collect { |m| m & group_mask }.uniq
 
-            expect(user_modes).to eq [0o060, 0o040, 0o000]
+            expect(group_modes).to include 0o060
          end
       end
 
@@ -41,14 +47,14 @@ module Invar
          let(:file_path) { test_safe_path 'invar_test_file' }
          let(:private_file) { described_class.new file_path }
 
-         before(:each) do
+         before do
             file_path.dirname.mkpath
             file_path.write ''
             file_path.chmod 0o600
          end
 
          it 'should NOT complain when the file has proper permissions' do
-            PrivateFile::ALLOWED_MODES.each do |mode|
+            described_class::ALLOWED_MODES.each do |mode|
                file_path.chmod(mode)
 
                expect do
@@ -63,9 +69,9 @@ module Invar
             private_file.read
          end
 
-         context 'improper permissions' do
+         context 'when file has improper permissions' do
             # Each is an octal mode triplet [User, Group, Others].
-            illegal_modes = (0o000..0o777).to_a - PrivateFile::ALLOWED_MODES
+            illegal_modes = (0o000..0o777).to_a - described_class::ALLOWED_MODES
 
             illegal_modes.each do |mode|
                it "should complain when file has mode #{ format('%04o', mode) }" do
@@ -78,7 +84,7 @@ module Invar
 
                   expect do
                      private_file.read
-                  end.to raise_error PrivateFile::FilePermissionsError,
+                  end.to raise_error described_class::FilePermissionsError,
                                      include(msg).and(include(mode_msg)).and(include('chmod 600'))
                end
             end

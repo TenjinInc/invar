@@ -2,23 +2,26 @@
 
 require 'spec_helper'
 
+# Turning off a few rspec cops for this file to keep the test mode stuff together in one place because it uses require
+# statements and is a bit fragile.
+#
+# rubocop:disable RSpec/DescribeClass
+# rubocop:disable RSpec/NestedGroups
+# rubocop:disable RSpec/DescribedClass
 describe 'Invar test extension' do
    let(:name) { 'my-app' }
 
-   context 'test module is not loaded' do
+   context 'when test module is not loaded' do
       describe Invar do
-         let(:default_lockbox_key) { '0' * 64 }
-         let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
+         let(:lockbox) { Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY) }
 
-         let(:name) { 'my-app' }
          let(:configs_dir) do
             test_safe_path('~/.config') / name
          end
          let(:config_path) { configs_dir / 'config.yml' }
          let(:secrets_path) { configs_dir / 'secrets.yml' }
-         let(:key_path) { configs_dir / 'master_key' }
 
-         before(:each) do
+         before do
             configs_dir.mkpath
 
             config_path.write ' - --'
@@ -26,12 +29,14 @@ describe 'Invar test extension' do
             secrets_path.binwrite lockbox.encrypt(' - --')
             secrets_path.chmod 0o600
 
-            key_path.write default_lockbox_key
+            key_path = configs_dir / 'master_key'
+
+            key_path.write SpecHelpers::TEST_LOCKBOX_KEY
             key_path.chmod 0o600
          end
 
-         describe '.after_load ' do
-            it ' should explode when calling the method normally ' do
+         describe '.after_load' do
+            it 'should explode when calling the method normally' do
                expect do
                   Invar.after_load do |_|
                      # etc
@@ -39,7 +44,7 @@ describe 'Invar test extension' do
                end.to raise_error Invar::ImmutableRealityError, Invar::ImmutableRealityError::HOOK_MSG
             end
 
-            it ' should explode when using #method' do
+            it 'should explode when using #method' do
                expect do
                   Invar.method(:after_load).call do |_|
                      # etc
@@ -62,13 +67,14 @@ describe 'Invar test extension' do
             end
          end
 
-         it 'should raise error as normal for non-test methods' do
+         it 'should raise error as normal for non-test methods when called normally' do
             # using normal calls
             expect do
                Invar.asdf
             end.to raise_error NoMethodError
+         end
 
-            # and using #method
+         it 'should raise error as normal for non-test methods when called using #method' do
             expect do
                Invar.method(:asdf).call
             end.to raise_error NameError
@@ -98,13 +104,13 @@ describe 'Invar test extension' do
             end
          end
 
-         it 'should raise error as normal for non-test methods' do
-            # using normal calls
+         it 'should raise error as normal for non-test methods when called normally' do
             expect do
                scope.asdf
             end.to raise_error NoMethodError
+         end
 
-            # and using #method
+         it 'should raise error as normal for non-test methods when called using #method' do
             expect do
                scope.method(:asdf).call
             end.to raise_error NameError
@@ -112,7 +118,7 @@ describe 'Invar test extension' do
       end
    end
 
-   context 'test module is loaded' do
+   context 'when test module is loaded' do
       before do
          require 'invar/test'
       end
@@ -127,8 +133,7 @@ describe 'Invar test extension' do
                demo_block = proc {}
                Invar.after_load(&demo_block)
 
-               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__.size).to eq 1
-               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to include demo_block
+               expect(Invar::TestExtension::RealityMethods.__after_load_hooks__).to eq [demo_block]
             end
 
             it 'should store multiple handler blocks' do
@@ -150,18 +155,15 @@ describe 'Invar test extension' do
       end
 
       describe Invar::Reality do
-         let(:default_lockbox_key) { '0' * 64 }
-         let(:lockbox) { Lockbox.new(key: default_lockbox_key) }
+         let(:lockbox) { Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY) }
 
-         let(:name) { 'my-app' }
          let(:configs_dir) do
             Pathname.new('~/.config').expand_path / name
          end
          let(:config_path) { configs_dir / 'config.yml' }
          let(:secrets_path) { configs_dir / 'secrets.yml' }
-         let(:key_path) { configs_dir / 'master_key' }
 
-         before(:each) do
+         before do
             configs_dir.mkpath
 
             config_path.write '---'
@@ -169,13 +171,15 @@ describe 'Invar test extension' do
             secrets_path.binwrite lockbox.encrypt('---')
             secrets_path.chmod 0o600
 
-            key_path.write default_lockbox_key
+            key_path = configs_dir / 'master_key'
+
+            key_path.write SpecHelpers::TEST_LOCKBOX_KEY
             key_path.chmod 0o600
          end
 
-         let(:fake_home) { test_safe_path '/home/someone' }
+         around do |example|
+            fake_home = test_safe_path '/home/someone'
 
-         around :each do |example|
             ClimateControl.modify('HOME' => fake_home.to_s) do
                example.run
             end
@@ -184,11 +188,8 @@ describe 'Invar test extension' do
          it 'should run the handler after loading an instance' do
             has_run = false
 
-            Invar.after_load do
-               has_run = true
-            end
+            Invar.after_load { has_run = true }
 
-            expect(has_run).to be false
             described_class.new namespace: name
             expect(has_run).to be true
          end
@@ -214,8 +215,9 @@ describe 'Invar test extension' do
             it 'should override multiple data fields' do
                scope.pretend(event: 'Fireworks', host: 'Gandalf')
 
-               expect(scope / :event).to eq 'Fireworks'
-               expect(scope / :host).to eq 'Gandalf'
+               stored_values = [scope / :event, scope / :host]
+
+               expect(stored_values).to eq %w[Fireworks Gandalf]
             end
 
             it 'should convert the key to a symbol' do
@@ -227,7 +229,7 @@ describe 'Invar test extension' do
             it 'should convert hashes to a Scope' do
                scope.pretend(entertainment: {type: 'Fireworks', provider: 'Gandalf'})
 
-               expect(scope / :entertainment).to be_an Invar::Scope
+               expect(scope / :entertainment).to be_a described_class
             end
          end
 
@@ -280,14 +282,15 @@ describe 'Invar test extension' do
                }
             end
 
-            it 'should use pretend values instead of regular ones' do
+            before do
                scope.pretend(event: 'Disappearance')
+            end
 
+            it 'should use pretend values instead of regular ones' do
                expect(scope.to_h).to include(event: 'Disappearance')
             end
 
             it 'should convert subscopes to hash' do
-               scope.pretend(event: 'Disappearance')
                scope[:entertainment].pretend(show: 'Magic')
 
                expected = {
@@ -305,3 +308,6 @@ describe 'Invar test extension' do
       end
    end
 end
+# rubocop:enable RSpec/DescribeClass
+# rubocop:enable RSpec/NestedGroups
+# rubocop:enable RSpec/DescribedClass

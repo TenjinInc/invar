@@ -8,24 +8,22 @@ require 'invar/rake/tasks'
 module Invar
    module Rake
       describe 'Rake Task Implementation' do
-         let(:name) { 'test-app' }
-         let(:default_lockbox_key) { '0' * 64 }
-         before(:each) do
+         let(:tty_status) { true }
+
+         before do
             ::Rake::Task.clear
-            Invar::Rake::Tasks.define namespace: name
+            Invar::Rake::Tasks.define namespace: SpecHelpers::TEST_APP_NAME
 
             task.reenable
 
             # Prevent it from opening actual editor
             allow_any_instance_of(Invar::Rake::Task::NamespacedFileTask).to receive(:system)
-         end
 
-         before :each do
             allow($stdin).to receive(:tty?).and_return(tty_status)
          end
 
          # Silencing the terminal output because there is a lot of it
-         around(:each) do |example|
+         around do |example|
             $stdout = StringIO.new
             $stderr = StringIO.new
             example.run
@@ -33,19 +31,17 @@ module Invar
             $stderr = STDERR
          end
 
-         let(:tty_status) { true }
-
-         context 'invar:init' do
+         describe 'invar:init' do
             let(:task) { ::Rake::Task['invar:init'] }
 
-            context '$HOME is defined' do
+            context 'when $HOME is defined' do
                let(:configs_dir) do
-                  Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name
+                  Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / SpecHelpers::TEST_APP_NAME
                end
                let(:config_path) { configs_dir / 'config.yml' }
                let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-               around :each do |example|
+               around do |example|
                   ClimateControl.modify('HOME' => test_safe_path('/home/somebody').to_s) do
                      example.run
                   end
@@ -78,8 +74,8 @@ module Invar
                it 'should only init secrets when specified' do
                   task.invoke('secrets')
 
-                  expect(config_path).to_not exist
                   expect(secrets_path).to exist
+                  expect(config_path).to_not exist
                end
 
                it 'should complain when specified file type is wrong' do
@@ -95,11 +91,11 @@ module Invar
                end
 
                it 'should encrypt the secrets file' do
-                  allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+                  allow(Lockbox).to receive(:generate_key).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                   task.invoke
 
-                  box = Lockbox.new(key: default_lockbox_key)
+                  box = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   encrypted = secrets_path.binread
 
@@ -114,14 +110,14 @@ module Invar
 
                # this allows easier piping to a file or whatever
                it 'should print the secret to stdout' do
-                  allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+                  allow(Lockbox).to receive(:generate_key).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                   expect do
                      task.invoke
-                  end.to output(include(default_lockbox_key)).to_stdout
+                  end.to output(include(SpecHelpers::TEST_LOCKBOX_KEY)).to_stdout
                end
 
-               context 'both files already exist' do
+               context 'when both files already exist' do
                   before do
                      configs_dir.mkpath
                      config_path.write ''
@@ -139,7 +135,7 @@ module Invar
                   end
                end
 
-               context 'config file already exists' do
+               context 'when config file already exists' do
                   before do
                      configs_dir.mkpath
                      config_path.write ''
@@ -157,7 +153,7 @@ module Invar
                   end
                end
 
-               context 'secrets file already exists' do
+               context 'when secrets file already exists' do
                   before do
                      configs_dir.mkpath
                      secrets_path.write ''
@@ -175,17 +171,18 @@ module Invar
                end
             end
 
-            context '$HOME is undefined' do
-               let(:search_path) do
-                  ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
-                     Pathname.new(p) / name
+            context 'when $HOME is undefined' do
+               let(:configs_dir) do
+                  search_path = ENV.fetch('XDG_CONFIG_DIRS',
+                                          Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
+                     Pathname.new(p) / SpecHelpers::TEST_APP_NAME
                   end
+                  search_path.first
                end
-               let(:configs_dir) { search_path.first }
                let(:config_path) { configs_dir / 'config.yml' }
                let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-               around :each do |example|
+               around do |example|
                   # setting home to nil is required for CC to track and reset the change
                   ClimateControl.modify(XDG_CONFIG_DIRS: test_safe_path(Invar::XDG::Defaults::CONFIG_DIRS).to_s,
                                         HOME:            nil) do
@@ -212,11 +209,11 @@ module Invar
                end
 
                it 'should encrypt the secrets file' do
-                  allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+                  allow(Lockbox).to receive(:generate_key).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                   task.invoke
 
-                  box = Lockbox.new(key: default_lockbox_key)
+                  box = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   encrypted = secrets_path.binread
 
@@ -231,14 +228,14 @@ module Invar
 
                # this allows easier piping to a file or whatever
                it 'should print the decryption key to stdout' do
-                  allow(Lockbox).to receive(:generate_key).and_return default_lockbox_key
+                  allow(Lockbox).to receive(:generate_key).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                   expect do
                      task.invoke
-                  end.to output(include(default_lockbox_key)).to_stdout
+                  end.to output(include(SpecHelpers::TEST_LOCKBOX_KEY)).to_stdout
                end
 
-               context 'both files already exist' do
+               context 'when both files already exist' do
                   before do
                      configs_dir.mkpath
                      config_path.write ''
@@ -256,7 +253,7 @@ module Invar
                   end
                end
 
-               context 'config file already exists' do
+               context 'when config file already exists' do
                   before do
                      configs_dir.mkpath
                      config_path.write ''
@@ -274,7 +271,7 @@ module Invar
                   end
                end
 
-               context 'secrets file already exists' do
+               context 'when secrets file already exists' do
                   before do
                      configs_dir.mkpath
                      secrets_path.write ''
@@ -293,15 +290,17 @@ module Invar
             end
          end
 
-         context 'invar:configs' do
+         describe 'invar:configs' do
             let(:task) { ::Rake::Task['invar:configs'] }
 
             let(:fake_home) { test_safe_path '/home/somebody' }
 
-            let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+            let(:configs_dir) do
+               Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / SpecHelpers::TEST_APP_NAME
+            end
             let(:config_path) { configs_dir / 'config.yml' }
 
-            around :each do |example|
+            around do |example|
                ClimateControl.modify HOME: fake_home&.to_s do
                   configs_dir.mkpath
                   config_path.write ''
@@ -324,8 +323,8 @@ module Invar
                xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
                xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-               search_path = [Pathname.new(xdg_home).expand_path / name]
-                                   .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+               search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
+                                   .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
 
                msg = <<~MSG
                   Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
@@ -341,18 +340,18 @@ module Invar
                expect { task.invoke }.to output(include(config_path.to_s)).to_stderr
             end
 
-            context '$HOME is undefined' do
+            context 'when $HOME is undefined' do
                let(:search_path) do
                   ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':').collect do |p|
                      test_safe_path(p)
                   end
                end
-               let(:configs_dir) { search_path.first / name }
+               let(:configs_dir) { search_path.first / SpecHelpers::TEST_APP_NAME }
                let(:config_path) { configs_dir / 'config.yml' }
 
                let(:fake_home) { nil }
 
-               around :each do |example|
+               around do |example|
                   ClimateControl.modify XDG_CONFIG_DIRS: search_path.join(':') do
                      search_path.each(&:mkpath)
                      config_path.write ''
@@ -373,7 +372,7 @@ module Invar
                it 'should abort if the file does not exist' do
                   config_path.delete
 
-                  expected_search_locations = search_path.collect { |path| path / name }
+                  expected_search_locations = search_path.collect { |path| path / SpecHelpers::TEST_APP_NAME }
 
                   msg = <<~MSG
                      Abort: Could not find #{ config_path.basename }. Searched in: #{ expected_search_locations.join(', ') }
@@ -388,14 +387,11 @@ module Invar
                end
             end
 
-            context 'content provided in stdin pipe' do
-               let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
-               let(:config_path) { configs_dir / 'config.yml' }
-
-               before(:each) do
-                  configs_dir.mkpath
-                  config_path.write ''
+            context 'when content provided in stdin pipe' do
+               let(:configs_dir) do
+                  Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / SpecHelpers::TEST_APP_NAME
                end
+               let(:config_path) { configs_dir / 'config.yml' }
 
                let(:input_string) do
                   <<~YML
@@ -406,7 +402,13 @@ module Invar
 
                # tty is false when stdin is piped
                let(:tty_status) { false }
-               around(:each) do |example|
+
+               before do
+                  configs_dir.mkpath
+                  config_path.write ''
+               end
+
+               around do |example|
                   with_pipe_input input_string do
                      example.call
                   end
@@ -427,28 +429,30 @@ module Invar
             end
          end
 
-         context 'invar:secrets' do
+         describe 'invar:secrets' do
             let(:task) { ::Rake::Task['invar:secrets'] }
 
-            before :each do
+            before do
                # hard out on blocking reads to allow any test to fail that unexpectedly calls read
                expect($stdin).to_not receive(:gets)
             end
 
-            context '$HOME is defined' do
+            context 'when $HOME is defined' do
                let(:home) { '/some/home/dir' }
-               let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+               let(:configs_dir) do
+                  Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / SpecHelpers::TEST_APP_NAME
+               end
                let(:secrets_path) { configs_dir / 'secrets.yml' }
 
-               around :each do |example|
+               around do |example|
                   ClimateControl.modify HOME: test_safe_path('/home/somebody').to_s do
                      example.run
                   end
                end
 
-               before(:each) do
+               before do
                   configs_dir.mkpath
-                  lockbox = Lockbox.new(key: default_lockbox_key)
+                  lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   secrets_path.binwrite lockbox.encrypt <<~YML
                      ---
@@ -456,9 +460,9 @@ module Invar
                   secrets_path.chmod(0o600)
                end
 
-               context 'Lockbox master key is defined' do
-                  around(:each) do |example|
-                     with_lockbox_key(default_lockbox_key, &example)
+               context 'when Lockbox master key is defined' do
+                  around do |example|
+                     with_lockbox_key(SpecHelpers::TEST_LOCKBOX_KEY, &example)
                   end
 
                   it 'should NOT ask for it from STDIN' do
@@ -472,18 +476,18 @@ module Invar
                   end
                end
 
-               context 'Lockbox master key is undefined' do
-                  around(:each) do |example|
+               context 'when Lockbox master key is undefined' do
+                  around do |example|
                      with_lockbox_key(nil, &example)
                   end
 
-                  context 'STDIN is TTY' do
+                  context 'when STDIN is TTY' do
                      let(:tty_status) { true }
 
                      it 'should ask for it from STDIN' do
                         msg = "Enter master key to decrypt #{ secrets_path }:"
 
-                        expect($stdin).to receive(:noecho).and_return default_lockbox_key
+                        allow($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                         expect do
                            task.invoke
@@ -491,13 +495,13 @@ module Invar
                      end
 
                      it 'should read the password from STDIN without echo' do
-                        expect($stdin).to receive(:noecho).and_return default_lockbox_key
+                        expect($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                         task.invoke
                      end
                   end
 
-                  context 'STDIN is not TTY' do
+                  context 'when STDIN is not TTY' do
                      let(:tty_status) { false }
 
                      it 'should raise an error instead of asking from STDIN' do
@@ -508,31 +512,35 @@ module Invar
                   end
                end
 
-               it 'should abort if the file does not exist' do
-                  secrets_path.delete
+               context 'when file does not exist' do
+                  before do
+                     secrets_path.delete
+                  end
 
-                  xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
-                  xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
+                  it 'should abort' do
+                     xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+                     xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-                  search_path = [Pathname.new(xdg_home).expand_path / name]
-                                      .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+                     search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
+                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
 
-                  msg = <<~MSG
-                     Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-                     #{ Invar::Rake::Task::CREATE_SUGGESTION }
-                  MSG
+                     msg = <<~MSG
+                        Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
+                     MSG
 
-                  expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                  end
                end
 
                it 'should state the file saved' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
                   end
                end
 
                it 'should clone the decrypted contents into the tempfile' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      new_content = '---'
                      tmpfile     = double('tmpfile', path: '/tmp/whatever', read: new_content)
 
@@ -546,7 +554,7 @@ module Invar
                end
 
                it 'should edit the secrets tmpfile' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      tmpfile = double('tmpfile', write: nil, rewind: nil, read: '---', path: '/tmp/whatever')
 
                      allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
@@ -568,11 +576,11 @@ module Invar
                   tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
                   allow(Tempfile).to receive(:create).and_yield tmpfile
 
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
                   end
 
-                  lockbox = Lockbox.new(key: default_lockbox_key)
+                  lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
                end
@@ -588,18 +596,18 @@ module Invar
                   tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
                   allow(Tempfile).to receive(:create).and_yield tmpfile
 
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
                   end
 
-                  lockbox = Lockbox.new(key: default_lockbox_key)
+                  lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
                   mode = secrets_path.lstat.mode & PrivateFile::PERMISSIONS_MASK
                   expect(mode).to eq custom_permissions
                end
 
-               context 'content provided in stdin pipe' do
+               context 'when content provided in stdin pipe' do
                   let :input_string do
                      <<~YML
                         ---
@@ -607,8 +615,8 @@ module Invar
                      YML
                   end
 
-                  around(:each) do |example|
-                     with_lockbox_key default_lockbox_key do
+                  around do |example|
+                     with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                         with_pipe_input input_string do
                            example.call
                         end
@@ -625,7 +633,7 @@ module Invar
                   it 'should use the provided content' do
                      task.invoke
 
-                     lockbox   = Lockbox.new key: default_lockbox_key
+                     lockbox   = Lockbox.new key: SpecHelpers::TEST_LOCKBOX_KEY
                      decrypted = lockbox.decrypt secrets_path.read
                      expect(decrypted).to eq input_string
                   end
@@ -633,12 +641,14 @@ module Invar
             end
          end
 
-         context 'invar:rotate' do
+         describe 'invar:rotate' do
             let(:task) { ::Rake::Task['invar:rotate'] }
 
-            context '$HOME is defined' do
+            context 'when $HOME is defined' do
                let(:fake_home) { test_safe_path('/home/somebody') }
-               let(:configs_dir) { Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / name }
+               let(:configs_dir) do
+                  Pathname.new(Invar::XDG::Defaults::CONFIG_HOME).expand_path / SpecHelpers::TEST_APP_NAME
+               end
                let(:secrets_path) { configs_dir / 'secrets.yml' }
                let(:secrets_content) do
                   <<~YML
@@ -647,23 +657,28 @@ module Invar
                   YML
                end
 
-               around :each do |example|
+               let(:new_key) do
+                  $stdout.rewind
+                  $stdout.readline.chomp
+               end
+
+               around do |example|
                   ClimateControl.modify HOME: fake_home.to_s do
                      example.run
                   end
                end
 
-               before(:each) do
+               before do
                   configs_dir.mkpath
-                  lockbox = Lockbox.new(key: default_lockbox_key)
+                  lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
                   secrets_path.binwrite lockbox.encrypt secrets_content
                   secrets_path.chmod 0o600
                end
 
-               context 'Lockbox master key is defined' do
-                  around(:each) do |example|
-                     with_lockbox_key(default_lockbox_key, &example)
+               context 'when Lockbox master key is defined' do
+                  around do |example|
+                     with_lockbox_key(SpecHelpers::TEST_LOCKBOX_KEY, &example)
                   end
 
                   it 'should NOT ask for it from STDIN' do
@@ -678,18 +693,18 @@ module Invar
                   end
                end
 
-               context 'Lockbox master key is undefined' do
-                  around(:each) do |example|
+               context 'when Lockbox master key is undefined' do
+                  around do |example|
                      with_lockbox_key(nil, &example)
                   end
 
-                  context 'STDIN is TTY' do
+                  context 'when STDIN is TTY' do
                      let(:tty_status) { true }
 
                      it 'should ask for it from STDIN without echo' do
                         msg = "Enter master key to decrypt #{ secrets_path }:"
 
-                        expect($stdin).to receive(:noecho).and_return default_lockbox_key
+                        expect($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                         expect do
                            task.invoke
@@ -697,7 +712,7 @@ module Invar
                      end
                   end
 
-                  context 'STDIN is not TTY' do
+                  context 'when STDIN is not TTY' do
                      let(:tty_status) { false }
 
                      it 'should raise an error instead of asking from STDIN' do
@@ -708,30 +723,29 @@ module Invar
                   end
                end
 
-               it 'should abort if the file does not exist' do
-                  secrets_path.delete
+               context 'when secrets file does not exist' do
+                  before do
+                     secrets_path.delete
+                  end
 
-                  xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
-                  xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
+                  it 'should abort' do
+                     xdg_home = ENV.fetch('XDG_CONFIG_HOME', Invar::XDG::Defaults::CONFIG_HOME)
+                     xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-                  search_path = [Pathname.new(xdg_home).expand_path / name]
-                                      .concat(xdg_dirs.collect { |p| Pathname.new(p) / name })
+                     search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
+                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
 
-                  msg = <<~MSG
-                     Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
-                     #{ Invar::Rake::Task::CREATE_SUGGESTION }
-                  MSG
+                     msg = <<~MSG
+                        Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
+                        #{ Invar::Rake::Task::CREATE_SUGGESTION }
+                     MSG
 
-                  expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
-               end
-
-               let(:new_key) do
-                  $stdout.rewind
-                  $stdout.readline.chomp
+                     expect { task.invoke }.to output(msg).to_stderr.and(raise_error(SystemExit))
+                  end
                end
 
                it 'should re-encrypt the file under the new key' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
                   end
 
@@ -741,7 +755,7 @@ module Invar
                end
 
                it 'should clean up the swap file' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
                   end
 
@@ -754,35 +768,35 @@ module Invar
                      raise Errno::ENOSPC, 'Dummy write failure'
                   end
 
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
 
                      expect(File).to_not exist "#{ secrets_path }.#{ Task::SecretsFileHandler::SWAP_EXT }"
                      expect(File).to exist secrets_path
 
-                     lockbox   = Lockbox.new key: default_lockbox_key
+                     lockbox   = Lockbox.new key: SpecHelpers::TEST_LOCKBOX_KEY
                      decrypted = lockbox.decrypt secrets_path.binread
                      expect(decrypted).to eq secrets_content
                   end
                end
 
                it 'should state the updated file' do
-                  with_lockbox_key default_lockbox_key do
+                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      expect { task.invoke }.to output(include(secrets_path.to_s)).to_stderr
                   end
                end
             end
          end
 
-         context 'invar:paths' do
+         describe 'invar:paths' do
             let(:task) { ::Rake::Task['invar:paths'] }
 
             it 'should report the search paths' do
                xdg_config_home = ENV.fetch('XDG_CONFIG_HOME', ::Invar::XDG::Defaults::CONFIG_HOME)
                xdg_config_dirs = ENV.fetch('XDG_CONFIG_DIRS', ::Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
-               xdg_config_home_path  = Pathname.new(xdg_config_home).expand_path / name
-               xdg_config_dirs_paths = xdg_config_dirs.collect { |p| Pathname.new(p) / name }
+               xdg_config_home_path  = Pathname.new(xdg_config_home).expand_path / SpecHelpers::TEST_APP_NAME
+               xdg_config_dirs_paths = xdg_config_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME }
 
                expected_stderr = <<~ERR
                   #{ xdg_config_home_path }

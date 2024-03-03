@@ -1,5 +1,10 @@
 inherit_from: ~/.config/rubocop/config.yml
 
+require:
+  - rubocop-performance
+  - rubocop-rspec
+  - rubocop-rake
+
 AllCops:
   Exclude:
     - 'bin/*'
@@ -12,3 +17,20 @@ Metrics/BlockLength:
 Metrics/ModuleLength:
   Exclude:
     - 'spec/**/*.rb'
+
+RSpec/ExampleWording:
+  Enabled: false
+
+RSpec/ExampleLength:
+  CountAsOne:
+    - array
+    - hash
+    - heredoc
+    - method_call
+
+RSpec/NotToNot:
+  Enabled: false
+
+# TODO: remove this restriction
+RSpec/MultipleMemoizedHelpers:
+  Enabled: false

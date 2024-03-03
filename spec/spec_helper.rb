@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# need simplecov before anything else
 require 'simplecov'
 
 SimpleCov.start
@@ -8,10 +9,14 @@ $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
 require 'invar'
 
-require 'climate_control'
+Bundler.require :test
 
 module SpecHelpers
    TEST_TMP_ROOT = Pathname.new(Dir.mktmpdir('invar_test_')).expand_path.freeze
+
+   TEST_LOCKBOX_KEY = '0' * 64
+
+   TEST_APP_NAME = 'test-app'
 
    # Runs the given block in a context where STDIN is connected to a pipe containing the given input string
    #
@@ -51,7 +56,7 @@ module SpecHelpers
 
    def self.included(example_group)
       # Wipe out the test files after each step
-      example_group.after :each do
+      example_group.after do
          TEST_TMP_ROOT.each_child(&:rmtree)
       end
    end
