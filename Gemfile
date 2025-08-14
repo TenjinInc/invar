@@ -8,10 +8,10 @@ gemspec
 group :development do
    gem 'bundler', '~> 2.3'
    gem 'rake', '~> 13.1'
-   gem 'rubocop', '~> 1.61'
-   gem 'rubocop-performance', '~> 1.20'
-   gem 'rubocop-rake', '~> 0.6'
-   gem 'rubocop-rspec', '~> 2.27'
+   gem 'rubocop', '~> 1.79'
+   gem 'rubocop-performance', '~> 1.25'
+   gem 'rubocop-rake', '~> 0.7'
+   gem 'rubocop-rspec', '~> 3.6'
    gem 'yard', '~> 0.9'
 end
 
