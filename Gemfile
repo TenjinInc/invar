@@ -7,7 +7,7 @@ gemspec
 
 group :development do
    gem 'bundler', '~> 2.3'
-   gem 'rake', '~> 13.1'
+   gem 'rake', '~> 13.3'
    gem 'rubocop', '~> 1.79'
    gem 'rubocop-performance', '~> 1.25'
    gem 'rubocop-rake', '~> 0.7'
