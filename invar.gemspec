@@ -30,5 +30,5 @@ Gem::Specification.new do |spec|
    spec.required_ruby_version = '>= 3.1'
 
    spec.add_dependency 'dry-schema', '>= 1.0'
-   spec.add_dependency 'lockbox', '>= 1.0'
+   spec.add_dependency 'lockbox', '>= 2.0'
 end
