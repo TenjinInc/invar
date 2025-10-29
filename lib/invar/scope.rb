@@ -34,7 +34,7 @@ module Invar
       def respond_to_missing?(method_name, include_all)
          guard_test_methods method_name
 
-         super(method_name, include_all)
+         super
       end
 
       # Returns a hash representation of this scope and subscopes.

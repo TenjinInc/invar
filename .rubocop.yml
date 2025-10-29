@@ -9,6 +9,9 @@ AllCops:
   Exclude:
     - 'bin/*'
 
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented_relative_to_receiver
+
 # rspec blocks are huge by design
 Metrics/BlockLength:
   Exclude:

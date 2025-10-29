@@ -432,6 +432,13 @@ module Invar
          describe 'invar:secrets' do
             let(:task) { ::Rake::Task['invar:secrets'] }
 
+            let :yaml_content do
+               <<~YML
+                  ---
+                  password: mellon
+               YML
+            end
+
             before do
                # hard out on blocking reads to allow any test to fail that unexpectedly calls read
                expect($stdin).to_not receive(:gets)
@@ -495,9 +502,11 @@ module Invar
                      end
 
                      it 'should read the password from STDIN without echo' do
-                        expect($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
+                        allow($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                         task.invoke
+
+                        expect($stdin).to have_received(:noecho)
                      end
                   end
 
@@ -522,7 +531,9 @@ module Invar
                      xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
                      search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
-                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
+                     search_path = search_path.concat(xdg_dirs.collect do |p|
+                        Pathname.new(p) / SpecHelpers::TEST_APP_NAME
+                     end)
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }
@@ -541,10 +552,9 @@ module Invar
 
                it 'should clone the decrypted contents into the tempfile' do
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                     new_content = '---'
-                     tmpfile     = double('tmpfile', path: '/tmp/whatever', read: new_content)
+                     tmpfile = double('tmpfile', path: '/tmp/whatever', read: yaml_content)
 
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return new_content
+                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return yaml_content
 
                      expect(tmpfile).to receive(:write).with("---\n")
                      expect(tmpfile).to receive(:rewind)
@@ -555,9 +565,9 @@ module Invar
 
                it 'should edit the secrets tmpfile' do
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                     tmpfile = double('tmpfile', write: nil, rewind: nil, read: '---', path: '/tmp/whatever')
+                     tmpfile = double('tmpfile', write: nil, rewind: nil, read: yaml_content, path: '/tmp/whatever')
 
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return '---'
+                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return yaml_content
 
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
                      expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
@@ -568,12 +578,7 @@ module Invar
                end
 
                it 'should update the encrypted file with new contents' do
-                  new_contents = <<~YML
-                     ---
-                     password: mellon
-                  YML
-
-                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
+                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: yaml_content)
                   allow(Tempfile).to receive(:create).and_yield tmpfile
 
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
@@ -582,18 +587,14 @@ module Invar
 
                   lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
-                  expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
+                  expect(lockbox.decrypt(secrets_path.read)).to eq yaml_content
                end
 
                it 'should not try to change the permissions' do
                   custom_permissions = 0o640
                   secrets_path.chmod custom_permissions
 
-                  new_contents = <<~YML
-                     ---
-                     password: mellon
-                  YML
-                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: new_contents)
+                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: yaml_content)
                   allow(Tempfile).to receive(:create).and_yield tmpfile
 
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
@@ -602,22 +603,15 @@ module Invar
 
                   lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
 
-                  expect(lockbox.decrypt(secrets_path.read)).to eq new_contents
+                  expect(lockbox.decrypt(secrets_path.read)).to eq yaml_content
                   mode = secrets_path.lstat.mode & PrivateFile::PERMISSIONS_MASK
                   expect(mode).to eq custom_permissions
                end
 
                context 'when content provided in stdin pipe' do
-                  let :input_string do
-                     <<~YML
-                        ---
-                        password: 'mellon'
-                     YML
-                  end
-
                   around do |example|
                      with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                        with_pipe_input input_string do
+                        with_pipe_input yaml_content do
                            example.call
                         end
                      end
@@ -635,7 +629,7 @@ module Invar
 
                      lockbox   = Lockbox.new key: SpecHelpers::TEST_LOCKBOX_KEY
                      decrypted = lockbox.decrypt secrets_path.read
-                     expect(decrypted).to eq input_string
+                     expect(decrypted).to eq yaml_content
                   end
                end
             end

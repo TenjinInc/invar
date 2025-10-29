@@ -9,6 +9,7 @@ module Invar
    # Verifies a file is secure
    class PrivateFile
       extend Forwardable
+
       def_delegators :@delegate_sd_obj,
                      :stat, :to_s, :basename, :dirname, :extname, :==, :chmod, :rename, :write, :binwrite
 
