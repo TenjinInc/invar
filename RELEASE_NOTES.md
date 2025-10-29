@@ -19,6 +19,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * none
 
+## [0.11.0] - 2025-10-29
+
+### Major Changes
+
+* none
+
+### Minor Changes
+
+* Updated Lockbox dependency
+
+### Bugfixes
+
+* none
+
 ## [0.10.0] - 2025-08-14
 
 ### Major Changes
