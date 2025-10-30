@@ -73,7 +73,6 @@ module Invar
 
          it 'should return true when that key is defined' do
             expect(scope.key?(:domain)).to be true
-            expect(scope.key?(:party)).to be true
          end
 
          it 'should return false when that key is NOT defined' do

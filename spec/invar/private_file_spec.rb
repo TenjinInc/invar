@@ -64,9 +64,11 @@ module Invar
          end
 
          it 'should forward the read call to the wrapped pathname' do
-            expect(file_path).to receive(:read)
+            allow(file_path).to receive :read
 
             private_file.read
+
+            expect(file_path).to have_received :read
          end
 
          context 'when file has improper permissions' do

@@ -51,6 +51,10 @@ module Invar
                   task.invoke
 
                   expect(config_path).to exist
+               end
+
+               it 'should protect the created config file in the XDG_CONFIG_HOME path' do
+                  task.invoke
 
                   file_mode = config_path.stat.mode & 0o777
                   expect(file_mode).to eq 0o600
@@ -60,22 +64,49 @@ module Invar
                   task.invoke
 
                   expect(secrets_path).to exist
+               end
+
+               it 'should protect the secrets file in the XDG_CONFIG_HOME path' do
+                  task.invoke
+
                   file_mode = secrets_path.stat.mode & 0o777
                   expect(file_mode).to eq 0o600
                end
 
-               it 'should only init config when specified' do
-                  task.invoke('config')
+               context 'when config only specified' do
+                  let :arg do
+                     'config'
+                  end
 
-                  expect(config_path).to exist
-                  expect(secrets_path).to_not exist
+                  it 'should init config' do
+                     task.invoke arg
+
+                     expect(config_path).to exist
+                  end
+
+                  it 'should NOT init secrets' do
+                     task.invoke arg
+
+                     expect(secrets_path).to_not exist
+                  end
                end
 
-               it 'should only init secrets when specified' do
-                  task.invoke('secrets')
+               context 'when secrets only specified' do
+                  let :arg do
+                     'secrets'
+                  end
 
-                  expect(secrets_path).to exist
-                  expect(config_path).to_not exist
+                  it 'should init secrets' do
+                     task.invoke arg
+
+                     expect(secrets_path).to exist
+                  end
+
+                  it 'should NOT init config' do
+                     task.invoke arg
+
+                     expect(config_path).to_not exist
+                  end
                end
 
                it 'should complain when specified file type is wrong' do
@@ -324,7 +355,7 @@ module Invar
                xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
                search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
-                                   .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
+               search_path.concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
 
                msg = <<~MSG
                   Abort: Could not find #{ config_path.basename }. Searched in: #{ search_path.join(', ') }
@@ -451,6 +482,10 @@ module Invar
                end
                let(:secrets_path) { configs_dir / 'secrets.yml' }
 
+               let :tmpfile do
+                  instance_double(File, path: '/tmp/whatever', write: nil, rewind: nil, read: yaml_content)
+               end
+
                around do |example|
                   ClimateControl.modify HOME: test_safe_path('/home/somebody').to_s do
                      example.run
@@ -465,6 +500,8 @@ module Invar
                      ---
                   YML
                   secrets_path.chmod(0o600)
+
+                  allow(Tempfile).to receive(:create).and_yield tmpfile
                end
 
                context 'when Lockbox master key is defined' do
@@ -472,10 +509,16 @@ module Invar
                      with_lockbox_key(SpecHelpers::TEST_LOCKBOX_KEY, &example)
                   end
 
+                  it 'should NOT listen to STDIN' do
+                     allow($stdin).to receive :noecho
+
+                     task.invoke
+
+                     expect($stdin).to_not have_received :noecho
+                  end
+
                   it 'should NOT ask for it from STDIN' do
                      msg = 'Enter master key to decrypt'
-
-                     expect($stdin).to_not receive(:noecho)
 
                      expect do
                         task.invoke
@@ -506,7 +549,7 @@ module Invar
 
                         task.invoke
 
-                        expect($stdin).to have_received(:noecho)
+                        expect($stdin).to have_received :noecho
                      end
                   end
 
@@ -531,7 +574,7 @@ module Invar
                      xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
                      search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
-                     search_path = search_path.concat(xdg_dirs.collect do |p|
+                     search_path.concat(xdg_dirs.collect do |p|
                         Pathname.new(p) / SpecHelpers::TEST_APP_NAME
                      end)
 
@@ -552,23 +595,18 @@ module Invar
 
                it 'should clone the decrypted contents into the tempfile' do
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                     tmpfile = double('tmpfile', path: '/tmp/whatever', read: yaml_content)
-
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return yaml_content
-
-                     expect(tmpfile).to receive(:write).with("---\n")
-                     expect(tmpfile).to receive(:rewind)
+                     allow(tmpfile).to receive(:write)
+                     allow(tmpfile).to receive(:rewind)
 
                      task.invoke
+
+                     expect(tmpfile).to have_received(:write).with("---\n")
+                     expect(tmpfile).to have_received(:rewind)
                   end
                end
 
                it 'should edit the secrets tmpfile' do
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                     tmpfile = double('tmpfile', write: nil, rewind: nil, read: yaml_content, path: '/tmp/whatever')
-
-                     allow(Tempfile).to receive(:create).and_yield(tmpfile).and_return yaml_content
-
                      # the intention of 'exception: true' is to noisily fail, which can be useful when automating
                      expect_any_instance_of(Invar::Rake::Task::SecretsFileHandler)
                            .to receive(:system).with('editor', '/tmp/whatever', exception: true)
@@ -578,9 +616,6 @@ module Invar
                end
 
                it 'should update the encrypted file with new contents' do
-                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: yaml_content)
-                  allow(Tempfile).to receive(:create).and_yield tmpfile
-
                   with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
                      task.invoke
                   end
@@ -590,22 +625,36 @@ module Invar
                   expect(lockbox.decrypt(secrets_path.read)).to eq yaml_content
                end
 
-               it 'should not try to change the permissions' do
-                  custom_permissions = 0o640
-                  secrets_path.chmod custom_permissions
-
-                  tmpfile = double('tmpfile', path: '/tmp/whatever', write: nil, rewind: nil, read: yaml_content)
-                  allow(Tempfile).to receive(:create).and_yield tmpfile
-
-                  with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
-                     task.invoke
+               context 'when secrets file has custom permissions' do
+                  let :custom_permissions do
+                     0o640
                   end
 
-                  lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
+                  before do
+                     secrets_path.chmod custom_permissions
+                  end
 
-                  expect(lockbox.decrypt(secrets_path.read)).to eq yaml_content
-                  mode = secrets_path.lstat.mode & PrivateFile::PERMISSIONS_MASK
-                  expect(mode).to eq custom_permissions
+                  it 'should not try to change the permissions' do
+                     with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
+                        task.invoke
+                     end
+
+                     lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
+
+                     lockbox.decrypt(secrets_path.read)
+                     mode = secrets_path.lstat.mode & PrivateFile::PERMISSIONS_MASK
+                     expect(mode).to eq custom_permissions
+                  end
+
+                  it 'should read the file normally' do
+                     with_lockbox_key SpecHelpers::TEST_LOCKBOX_KEY do
+                        task.invoke
+                     end
+
+                     lockbox = Lockbox.new(key: SpecHelpers::TEST_LOCKBOX_KEY)
+
+                     expect(lockbox.decrypt(secrets_path.read)).to eq yaml_content
+                  end
                end
 
                context 'when content provided in stdin pipe' do
@@ -675,11 +724,18 @@ module Invar
                      with_lockbox_key(SpecHelpers::TEST_LOCKBOX_KEY, &example)
                   end
 
+                  it 'should NOT listen on STDIN' do
+                     allow($stdin).to receive :gets
+
+                     task.invoke
+
+                     expect($stdin).to_not have_received(:gets)
+                  end
+
                   it 'should NOT ask for it from STDIN' do
                      msg = 'Enter master key to decrypt'
 
-                     expect($stdin).to_not receive(:gets)
-                     expect($stdin).to_not receive(:noecho)
+                     allow($stdin).to receive(:noecho)
 
                      expect do
                         task.invoke
@@ -695,14 +751,22 @@ module Invar
                   context 'when STDIN is TTY' do
                      let(:tty_status) { true }
 
+                     before do
+                        allow($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
+                     end
+
                      it 'should ask for it from STDIN without echo' do
                         msg = "Enter master key to decrypt #{ secrets_path }:"
-
-                        expect($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
 
                         expect do
                            task.invoke
                         end.to output(start_with(msg)).to_stderr
+                     end
+
+                     it 'should read from STDIN without echo' do
+                        task.invoke
+
+                        expect($stdin).to have_received(:noecho)
                      end
                   end
 
@@ -727,7 +791,7 @@ module Invar
                      xdg_dirs = ENV.fetch('XDG_CONFIG_DIRS', Invar::XDG::Defaults::CONFIG_DIRS).split(':')
 
                      search_path = [Pathname.new(xdg_home).expand_path / SpecHelpers::TEST_APP_NAME]
-                                         .concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
+                     search_path.concat(xdg_dirs.collect { |p| Pathname.new(p) / SpecHelpers::TEST_APP_NAME })
 
                      msg = <<~MSG
                         Abort: Could not find #{ secrets_path.basename }. Searched in: #{ search_path.join(', ') }

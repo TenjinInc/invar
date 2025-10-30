@@ -299,8 +299,8 @@ module Invar
             context 'when encryption key is missing' do
                before do
                   key_path.delete
-                  allow($stdin).to receive(:noecho).and_return SpecHelpers::TEST_LOCKBOX_KEY
-                  allow($stdin).to receive(:tty?).and_return(tty_status)
+                  allow($stdin).to receive_messages(noecho: SpecHelpers::TEST_LOCKBOX_KEY,
+                                                    tty?:   tty_status)
                end
 
                around do |example|

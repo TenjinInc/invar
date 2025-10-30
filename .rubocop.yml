@@ -11,6 +11,7 @@ AllCops:
 
 Layout/MultilineMethodCallIndentation:
   EnforcedStyle: indented_relative_to_receiver
+  IndentationWidth: 6
 
 # rspec blocks are huge by design
 Metrics/BlockLength:

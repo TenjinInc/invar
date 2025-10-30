@@ -12,12 +12,12 @@ module Invar
 
          describe '.define' do
             it 'should create an instance and call #define on it' do
-               instance = double('tasks instance')
+               instance = instance_double(Invar::Rake::Tasks, define: nil)
                allow(Invar::Rake::Tasks).to receive(:new).and_return instance
 
-               expect(instance).to receive(:define)
-
                Invar::Rake::Tasks.define(namespace: name)
+
+               expect(instance).to have_received(:define)
             end
          end
 
